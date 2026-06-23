@@ -3,16 +3,15 @@ name: Build MetaChat Browser (Windows)
 on:
   workflow_dispatch:
     inputs:
-      chromium_tag:
-        description: "Chromium tag to build"
+      chromium_commit:
+        description: "Chromium base commit"
         required: true
-        default: "150.0.7844.0"
+        default: "a64c8adb6a201e1dda195716f5f286047625b4c8"
 
 env:
-  CHROMIUM_TAG: ${{ github.event.inputs.chromium_tag || '150.0.7844.0' }}
+  CHROMIUM_COMMIT: ${{ github.event.inputs.chromium_commit || 'a64c8adb6a201e1dda195716f5f286047625b4c8' }}
   CHROMIUM_DIR: C:\chromium
   SRC_DIR: C:\chromium\src
-  FISH_COMMIT: a64c8adb6a35ed4b2dcecf48661b9af9be8532db
 
 jobs:
   build:
@@ -21,51 +20,90 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: metachat
 
       - name: Setup depot_tools
         shell: pwsh
-        run: git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git C:\depot_tools; echo "C:\depot_tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        run: |
+          git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git C:\depot_tools
+          echo "C:\depot_tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Setup VS2022
         shell: pwsh
-        run: choco install visualstudio2022buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended" -y; choco install windows-sdk-10.0 -y
+        run: |
+          choco install visualstudio2022buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended" -y
+          choco install windows-sdk-10.0 -y
 
-      - name: Fetch Chromium source (ChromiumFish fork)
+      - name: Fetch Chromium source at Fish baseline commit
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path $env:CHROMIUM_DIR
           cd $env:CHROMIUM_DIR
           fetch --nohooks --no-history chromium
           cd src
-          git remote add fish https://github.com/chromiumfish/chromium.git
-          git fetch fish $env:FISH_COMMIT --depth=1
-          git checkout $env:FISH_COMMIT
+          # ChromiumFish's upstream commit (a64c8adb6a) corresponds to
+          # Chromium ~150.0.7844.x. Checkout this exact commit.
+          git fetch origin $env:CHROMIUM_COMMIT --depth=1
+          git checkout $env:CHROMIUM_COMMIT
           gclient sync --with_branch_heads --with_tags --nohooks -D
+
+      - name: Apply ChromiumFish patches
+        shell: pwsh
+        run: |
+          $metachat = "$env:GITHUB_WORKSPACE\metachat"
+          $patchRoot = "$metachat\browser\patches"
+          $seriesFile = "$patchRoot\series"
+          if (Test-Path $seriesFile) {
+            cd $env:SRC_DIR
+            Get-Content $seriesFile | ForEach-Object {
+              $patch = $_.Trim()
+              if ($patch -and $patch -notmatch "^#") {
+                $patchFile = "$patchRoot\$patch"
+                if (Test-Path $patchFile) {
+                  Write-Host "Fish: $patch"
+                  git apply --reject --whitespace=fix $patchFile 2>&1
+                }
+              }
+            }
+            $rejCount = (Get-ChildItem -Recurse -Filter "*.rej" -Name).Count
+            if ($rejCount -gt 0) {
+              Write-Host "FISH PATCHES FAILED: $rejCount reject files" -ForegroundColor Red
+              Get-ChildItem -Recurse -Filter "*.rej" | Select-Object -ExpandProperty FullName
+              exit 1
+            }
+            Write-Host "All Fish patches applied OK" -ForegroundColor Green
+          }
 
       - name: Overlay assets
         shell: pwsh
         run: |
-          $src = "$env:GITHUB_WORKSPACE\browser\assets"
+          $src = "$env:GITHUB_WORKSPACE\metachat\browser\assets"
           if (Test-Path $src) { robocopy $src "$env:SRC_DIR" /MIR /NJH /NJS /NP }
 
       - name: Apply MetaChat patches
         shell: pwsh
         run: |
-          $patchDir = "$env:GITHUB_WORKSPACE\browser\metachat-patches"
+          $patchDir = "$env:GITHUB_WORKSPACE\metachat\browser\metachat-patches"
           if (Test-Path $patchDir) {
+            cd $env:SRC_DIR
             Get-ChildItem "$patchDir\*.patch" | Sort-Object Name | ForEach-Object {
               Write-Host "MetaChat: $($_.Name)"
-              cd $env:SRC_DIR
               git apply --reject --whitespace=fix $_.FullName 2>&1
             }
             $rejCount = (Get-ChildItem -Recurse -Filter "*.rej" -Name).Count
-            if ($rejCount -gt 0) { Write-Host "FAILED: $rejCount reject files" -ForegroundColor Red; exit 1 }
+            if ($rejCount -gt 0) {
+              Write-Host "METACHAT PATCHES FAILED: $rejCount reject files" -ForegroundColor Red
+              exit 1
+            }
             Write-Host "All MetaChat patches applied OK" -ForegroundColor Green
           }
 
       - name: Build overrides
         shell: pwsh
-        run: New-Item -ItemType Directory -Force -Path "$env:SRC_DIR\build_overrides"; Set-Content -Path "$env:SRC_DIR\build_overrides\pdfium.gni" -Value "declare_args() { pdf_bundle_freetype_override = false }"
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:SRC_DIR\build_overrides"
+          Set-Content -Path "$env:SRC_DIR\build_overrides\pdfium.gni" -Value "declare_args() { pdf_bundle_freetype_override = false }"
 
       - name: Download toolchains
         shell: pwsh
@@ -78,7 +116,30 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path out\Release_GN_x64
-          Set-Content -Path out\Release_GN_x64\args.gn -Value ("is_debug = false" + [char]10 + "is_component_build = false" + [char]10 + "symbol_level = 0" + [char]10 + "blink_symbol_level = 0" + [char]10 + "v8_symbol_level = 0" + [char]10 + "enable_nacl = false" + [char]10 + "enable_remoting = false" + [char]10 + "enable_extensions = true" + [char]10 + "enable_plugins = true" + [char]10 + "enable_widevine = false" + [char]10 + "enable_swiftshader = false" + [char]10 + "enable_pdf = true" + [char]10 + "enable_pdfium = true" + [char]10 + "enable_printing = true" + [char]10 + "enable_print_preview = true" + [char]10 + "treat_warnings_as_errors = false" + [char]10 + "google_api_key = """ + [char]10 + "use_unofficial_version_number = false" + [char]10 + "chrome_pgo_phase = 0" + [char]10 + "enable_extensions_core = true" + [char]10 + "dawn_enable_vulkan_validation_layers = false" + [char]10 + "angle_enable_vulkan_validation_layers = false")
+          Set-Content -Path out\Release_GN_x64\args.gn -Value (
+            "is_debug = false" + [char]10 +
+            "is_component_build = false" + [char]10 +
+            "symbol_level = 0" + [char]10 +
+            "blink_symbol_level = 0" + [char]10 +
+            "v8_symbol_level = 0" + [char]10 +
+            "enable_nacl = false" + [char]10 +
+            "enable_remoting = false" + [char]10 +
+            "enable_extensions = true" + [char]10 +
+            "enable_plugins = true" + [char]10 +
+            "enable_widevine = false" + [char]10 +
+            "enable_swiftshader = false" + [char]10 +
+            "enable_pdf = true" + [char]10 +
+            "enable_pdfium = true" + [char]10 +
+            "enable_printing = true" + [char]10 +
+            "enable_print_preview = true" + [char]10 +
+            "treat_warnings_as_errors = false" + [char]10 +
+            "google_api_key = """ + [char]10 +
+            "use_unofficial_version_number = false" + [char]10 +
+            "chrome_pgo_phase = 0" + [char]10 +
+            "enable_extensions_core = true" + [char]10 +
+            "dawn_enable_vulkan_validation_layers = false" + [char]10 +
+            "angle_enable_vulkan_validation_layers = false"
+          )
 
       - name: Build
         shell: pwsh
