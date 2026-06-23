@@ -23,15 +23,11 @@ jobs:
 
       - name: Setup depot_tools
         shell: pwsh
-        run: |
-          git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git C:\depot_tools
-          echo "C:\depot_tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        run: git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git C:\depot_tools && echo "C:\depot_tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Setup VS2022
         shell: pwsh
-        run: |
-          choco install visualstudio2022buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended" -y
-          choco install windows-sdk-10.0 -y
+        run: choco install visualstudio2022buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended" -y && choco install windows-sdk-10.0 -y
 
       - name: Fetch Chromium source
         shell: pwsh
@@ -80,11 +76,9 @@ jobs:
             if ($rejFiles) { Write-Host "REJECTED" -ForegroundColor Red; $rejFiles; exit 1 }
           } else { Write-Host "No MetaChat patches" -ForegroundColor Yellow }
 
-      - name: Create build overrides
+      - name: Build overrides
         shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path $env:SRC_DIR\build_overrides
-          Set-Content -Path $env:SRC_DIR\build_overrides\pdfium.gni -Value "declare_args() { pdf_bundle_freetype_override = false }"
+        run: New-Item -ItemType Directory -Force -Path $env:SRC_DIR\build_overrides; Set-Content -Path $env:SRC_DIR\build_overrides\pdfium.gni -Value "declare_args() { pdf_bundle_freetype_override = false }"
 
       - name: Download toolchains
         shell: pwsh
@@ -95,35 +89,7 @@ jobs:
 
       - name: Configure GN
         shell: pwsh
-        run: |
-          cd $env:SRC_DIR
-          New-Item -ItemType Directory -Force -Path out\Release_GN_x64
-          $gnArgs = @"
-is_debug = false
-is_component_build = false
-symbol_level = 0
-blink_symbol_level = 0
-v8_symbol_level = 0
-enable_nacl = false
-enable_remoting = false
-enable_extensions = true
-enable_plugins = true
-enable_widevine = false
-enable_swiftshader = false
-enable_pdf = true
-enable_pdfium = true
-enable_printing = true
-enable_print_preview = true
-treat_warnings_as_errors = false
-google_api_key = ""
-use_unofficial_version_number = false
-chrome_pgo_phase = 0
-enable_extensions_core = true
-dawn_enable_vulkan_validation_layers = false
-angle_enable_vulkan_validation_layers = false
-"@
-          Set-Content -Path out\Release_GN_x64\args.gn -Value $gnArgs
-          gn gen out\Release_GN_x64 2>&1
+        run: New-Item -ItemType Directory -Force -Path out\Release_GN_x64; Set-Content -Path out\Release_GN_x64\args.gn -Value "is_debug = false`nis_component_build = false`nsymbol_level = 0`nblink_symbol_level = 0`nv8_symbol_level = 0`nenable_nacl = false`nenable_remoting = false`nenable_extensions = true`nenable_plugins = true`nenable_widevine = false`nenable_swiftshader = false`nenable_pdf = true`nenable_pdfium = true`nenable_printing = true`nenable_print_preview = true`ntreat_warnings_as_errors = false`ngoogle_api_key = ""`nuse_unofficial_version_number = false`nchrome_pgo_phase = 0`nenable_extensions_core = true`ndawn_enable_vulkan_validation_layers = false`nangle_enable_vulkan_validation_layers = false"
 
       - name: Build
         shell: pwsh
