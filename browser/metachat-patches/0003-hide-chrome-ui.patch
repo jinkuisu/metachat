@@ -1,9 +1,119 @@
 // MetaChat: hide native Chrome UI when --metachat-mode is active.
 // Uses a configurable command blocklist with allowlist override.
-// Default blocklist covers bookmarks/history/downloads/settings etc.
-// Allowlist preserves essential operations: reload, devtools, extensions.
 // Configure via --metachat-mode-blocklist and --metachat-mode-allowlist.
 // Both accept comma-separated IDC command names (e.g. "IDC_PRINT,IDC_SAVE_PAGE").
+//
+// == Default Blocklist (blocked commands in --metachat-mode) ==
+//
+// File & Page:
+//   IDC_OPEN_FILE          打开文件对话框 (Ctrl+O)
+//   IDC_SAVE_PAGE          保存网页 (Ctrl+S)
+//   IDC_PRINT              打印 (Ctrl+P)
+//   IDC_BASIC_PRINT        基本打印（无预览）
+//
+// Bookmarks & History:
+//   IDC_BOOKMARK_THIS_TAB  为当前页加书签 (Ctrl+D)
+//   IDC_BOOKMARK_ALL_TABS  为所有标签页加书签
+//   IDC_BOOKMARKS_MENU     书签菜单
+//   IDC_SHOW_BOOKMARK_BAR  显示/隐藏书签栏 (Ctrl+Shift+B)
+//   IDC_SHOW_BOOKMARK_MANAGER 书签管理器 (Ctrl+Shift+O)
+//   IDC_SHOW_BOOKMARK_SIDE_PANEL 书签侧面板
+//   IDC_SHOW_HISTORY       历史记录 (Ctrl+H)
+//   IDC_SHOW_HISTORY_SIDE_PANEL 历史侧面板
+//   IDC_SHOW_HISTORY_CLUSTERS_SIDE_PANEL 历史聚类侧面板
+//   IDC_SHOW_DOWNLOADS     下载内容 (Ctrl+J)
+//   IDC_RECENT_TABS_MENU   最近关闭的标签页
+//   IDC_READING_LIST_MENU  阅读清单
+//
+// Settings & Account:
+//   IDC_OPTIONS            设置 (chrome://settings)
+//   IDC_PERFORMANCE        性能设置
+//   IDC_IMPORT_SETTINGS    导入书签/设置
+//   IDC_CLEAR_BROWSING_DATA 清除浏览数据 (Ctrl+Shift+Del)
+//   IDC_ABOUT              关于 Chrome
+//   IDC_HELP_MENU          帮助菜单
+//   IDC_FEEDBACK           发送反馈
+//   IDC_SHOW_AVATAR_MENU   头像/账户菜单
+//   IDC_PROFILE_MENU       个人资料菜单
+//   IDC_CLOSE_PROFILE      关闭个人资料
+//   IDC_OPEN_GUEST_PROFILE 打开访客模式
+//   IDC_ADD_NEW_PROFILE    添加新个人资料
+//   IDC_MANAGE_CHROME_PROFILES 管理个人资料
+//   IDC_SHOW_SIGNIN        登录 Google 账户
+//   IDC_MANAGE_GOOGLE_ACCOUNT 管理 Google 账户
+//
+// Password & Autofill:
+//   IDC_SHOW_PASSWORD_MANAGER 密码管理器
+//   IDC_SAFETY_HUB_SHOW_PASSWORD_CHECKUP 密码安全检查
+//   IDC_SHOW_PAYMENT_METHODS 付款方式
+//   IDC_SHOW_ADDRESSES     地址管理
+//
+// Side Panels & Customize:
+//   IDC_SHOW_COMMENTS_SIDE_PANEL 评论侧面板
+//   IDC_SHOW_READING_MODE_SIDE_PANEL 阅读模式侧面板
+//   IDC_SHOW_CUSTOMIZE_CHROME_SIDE_PANEL 自定义 Chrome 侧面板
+//   IDC_CUSTOMIZE_CHROME   自定义 Chrome
+//   IDC_SHOW_CHROME_LABS   Chrome Labs 实验功能
+//
+// Translation & Media:
+//   IDC_SHOW_TRANSLATE     翻译此页
+//   IDC_CONTENT_CONTEXT_TRANSLATE 右键菜单翻译
+//   IDC_ROUTE_MEDIA        投屏/投放
+//   IDC_LIVE_CAPTION       实时字幕
+//
+// PWA & Web Apps:
+//   IDC_INSTALL_PWA        安装为应用
+//   IDC_CREATE_SHORTCUT    创建快捷方式
+//   IDC_OPEN_IN_PWA_WINDOW 在应用窗口中打开
+//   IDC_WEB_APP_SETTINGS   Web 应用设置
+//
+// Misc:
+//   IDC_UPGRADE_DIALOG     升级对话框
+//   IDC_CHROME_WHATS_NEW   新功能页面
+//   IDC_CHROME_TIPS        Chrome 使用技巧
+//
+// == Preserved (NOT blocked) ==
+//
+// Navigation:
+//   IDC_RELOAD              刷新页面 (F5 / Ctrl+R)
+//   IDC_RELOAD_BYPASSING_CACHE 强制刷新 (Ctrl+Shift+R)
+//   IDC_RELOAD_CLEARING_CACHE 清缓存刷新
+//
+// Tab Management:
+//   IDC_NEW_TAB             新建标签页 (Ctrl+T)
+//   IDC_CLOSE_TAB           关闭标签页 (Ctrl+W)
+//   IDC_RESTORE_TAB         恢复关闭的标签页 (Ctrl+Shift+T)
+//
+// Window Management:
+//   IDC_NEW_WINDOW          新建窗口 (Ctrl+N)
+//   IDC_NEW_INCOGNITO_WINDOW 新建无痕窗口 (Ctrl+Shift+N)
+//   IDC_FULLSCREEN          全屏 (F11)
+//   IDC_EXIT                退出
+//
+// Developer Tools:
+//   IDC_DEV_TOOLS           开发者工具 (F12)
+//   IDC_DEV_TOOLS_CONSOLE   控制台 (Ctrl+Shift+J)
+//   IDC_TASK_MANAGER        任务管理器 (Shift+Esc)
+//   IDC_VIEW_SOURCE         查看网页源码 (Ctrl+U)
+//
+// Extensions:
+//   IDC_MANAGE_EXTENSIONS   管理扩展 (chrome://extensions)
+//   IDC_EXTENSIONS_SUBMENU_MANAGE_EXTENSIONS
+//   IDC_EXTENSIONS_SUBMENU_VISIT_CHROME_WEB_STORE
+//   IDC_SAFETY_HUB_MANAGE_EXTENSIONS
+//
+// Page Actions:
+//   IDC_FIND               查找 (Ctrl+F)
+//   IDC_ZOOM_PLUS          放大 (Ctrl++)
+//   IDC_ZOOM_MINUS         缩小 (Ctrl+-)
+//   IDC_ZOOM_NORMAL        重置缩放 (Ctrl+0)
+//   IDC_COPY_URL           复制网址
+//
+// Edit:
+//   IDC_CUT / IDC_COPY / IDC_PASTE  剪贴板操作
+//   IDC_UNDO / IDC_REDO             撤销/重做
+//   IDC_SELECT_ALL                  全选
+//   IDC_DELETE                      删除
 
 diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
 --- a/chrome/browser/ui/browser_command_controller.cc
@@ -27,7 +137,6 @@ diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui
 +//   1. Allowlist check: if id is explicitly allowed, return false.
 +//   2. Blocklist check: if id is in default OR custom blocklist, return true.
 +//   3. Otherwise: return false (command runs normally).
-+// Allowlist takes precedence over both default and custom blocklists.
 +static bool IsMetachatModeBlockedCommand(int id) {
 +  const auto* cmdline = base::CommandLine::ForCurrentProcess();
 +  if (!cmdline->HasSwitch(switches::kMetachatMode)) {
@@ -35,8 +144,6 @@ diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui
 +  }
 +
 +  // Build allowlist set from --metachat-mode-allowlist.
-+  // Users can unblock any default-blocked command, e.g.:
-+  //   --metachat-mode-allowlist=IDC_PRINT,IDC_BOOKMARK_THIS_TAB
 +  static std::set<int> s_allowlist = []() {
 +    std::set<int> ids;
 +    std::string list = base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
@@ -45,7 +152,6 @@ diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui
 +    for (const auto& name : base::SplitString(
 +             list, ",", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY)) {
 +      int cmd_id = 0;
-+      // If it's a numeric ID, parse directly.
 +      if (base::StringToInt(name, &cmd_id)) {
 +        ids.insert(cmd_id);
 +      }
@@ -58,14 +164,12 @@ diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui
 +
 +  // Default blocklist: commands irrelevant to the messaging-browser experience.
 +  switch (id) {
-+    // File/host integration.
 +    case IDC_OPEN_FILE:
 +    case IDC_SAVE_PAGE:
 +    case IDC_PRINT:
 +#if BUILDFLAG(ENABLE_PRINTING)
 +    case IDC_BASIC_PRINT:
 +#endif
-+    // Bookmarks, history, downloads, reading list.
 +    case IDC_BOOKMARK_THIS_TAB:
 +    case IDC_BOOKMARK_ALL_TABS:
 +    case IDC_BOOKMARKS_MENU:
@@ -82,7 +186,6 @@ diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui
 +    case IDC_READING_LIST_MENU:
 +    case IDC_READING_LIST_MENU_ADD_TAB:
 +    case IDC_READING_LIST_MENU_SHOW_UI:
-+    // Settings, help, feedback, avatar/profile, sync.
 +    case IDC_OPTIONS:
 +    case IDC_PERFORMANCE:
 +    case IDC_IMPORT_SETTINGS:
@@ -100,7 +203,6 @@ diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui
 +    case IDC_MANAGE_CHROME_PROFILES:
 +    case IDC_SHOW_SIGNIN:
 +    case IDC_MANAGE_GOOGLE_ACCOUNT:
-+    // Password manager, autofill, safety hub, side panels.
 +    case IDC_SHOW_PASSWORD_MANAGER:
 +    case IDC_SAFETY_HUB_SHOW_PASSWORD_CHECKUP:
 +    case IDC_SHOW_PAYMENT_METHODS:
@@ -111,7 +213,6 @@ diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui
 +    case IDC_SHOW_CUSTOMIZE_CHROME_TOOLBAR:
 +    case IDC_CUSTOMIZE_CHROME:
 +    case IDC_SHOW_CHROME_LABS:
-+    // Translation, casting, PWAs.
 +    case IDC_SHOW_TRANSLATE:
 +    case IDC_CONTENT_CONTEXT_TRANSLATE:
 +    case IDC_ROUTE_MEDIA:
@@ -120,7 +221,6 @@ diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui
 +    case IDC_CREATE_SHORTCUT:
 +    case IDC_OPEN_IN_PWA_WINDOW:
 +    case IDC_WEB_APP_SETTINGS:
-+    // Update / what's-new / tips.
 +    case IDC_UPGRADE_DIALOG:
 +    case IDC_CHROME_WHATS_NEW:
 +    case IDC_CHROME_TIPS:
@@ -130,8 +230,6 @@ diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui
 +  }
 +
 +  // Check custom blocklist from --metachat-mode-blocklist.
-+  // Users can add extra blocked commands, e.g.:
-+  //   --metachat-mode-blocklist=IDC_FIND,IDC_ZOOM_PLUS
 +  static std::set<int> s_blocklist = []() {
 +    std::set<int> ids;
 +    std::string list = base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
@@ -147,6 +245,11 @@ diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui
 +    return ids;
 +  }();
 +  return s_blocklist.find(id) != s_blocklist.end();
++}
++
++bool IsMetachatModeEnabled() {
++  return base::CommandLine::ForCurrentProcess()->HasSwitch(
++      switches::kMetachatMode);
 +}
 +
  bool CanOpenFile(Browser* browser) {
@@ -200,24 +303,21 @@ diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/v
  #include "chrome/common/url_constants.h"
  #include "chrome/grit/branded_strings.h"
  #include "chrome/grit/generated_resources.h"
-@@ -146,6 +147,18 @@ BrowserView::BrowserView(std::unique_ptr<Browser> browser)
+@@ -146,6 +147,13 @@ BrowserView::BrowserView(std::unique_ptr<Browser> browser)
        // frame. This must be done early in BrowserView's lifecycle, before
        // BrowserFrame::InitBrowserFrame is called.
        if (browser_->is_type_app_popup()) {
-+        // MetaChat: in --metachat-mode, use frameless window style so
-+        // the browser window has no title bar or frame decorations.
++        // MetaChat: use frameless window in --metachat-mode.
 +        if (base::CommandLine::ForCurrentProcess()->HasSwitch(
 +                switches::kMetachatMode)) {
 +          set_frame_type(WidgetFrameType::kFullscreen);
 +          set_force_google_ui(false);
-+          SetShowTitleBar(false);
-+          SetShowIcon(false);
 +          continue;
 +        }
          set_frame_type(WidgetFrameType::kFullscreen);
          set_force_google_ui(false);
        }
-@@ -5090,6 +5103,13 @@ bool BrowserView::ShouldShowTabStrip() const {
+@@ -5090,6 +5098,12 @@ bool BrowserView::ShouldShowTabStrip() const {
  // MetaChat: local helper to check metachat-mode.
  bool IsMetachatModeEnabled() {
    return base::CommandLine::ForCurrentProcess()->HasSwitch(
@@ -225,43 +325,35 @@ diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/v
 +}
 +
 +bool BrowserView::ShouldShowTabStrip() const {
-+  // MetaChat: hide tab strip in --metachat-mode. Tabs managed via WebUI.
-+  if (IsMetachatModeEnabled()) {
-+    return false;
-+  }
++  // MetaChat: hide tab strip. Tabs managed via WebUI.
++  if (IsMetachatModeEnabled()) { return false; }
    // Original logic preserved below.
    return browser_->SupportsWindowFeature(
        Browser::WindowFeature::kFeatureTabstrip);
  }
 
-@@ -5109,6 +5129,11 @@ bool BrowserView::ShouldShowBookmarkBar(
+@@ -5109,6 +5123,10 @@ bool BrowserView::ShouldShowBookmarkBar(
      std::optional<ShowBookmarkBarWhileAnimating> show_bookmark_bar_while_animating)
      const {
-+  // MetaChat: hide bookmarks bar in --metachat-mode.
-+  if (IsMetachatModeEnabled()) {
-+    return false;
-+  }
++  // MetaChat: hide bookmarks bar.
++  if (IsMetachatModeEnabled()) { return false; }
    return browser_->SupportsWindowFeature(
        Browser::WindowFeature::kFeatureBookmarkBar) &&
        !browser_->profile()->GetPrefs()->GetBoolean(
            bookmarks::prefs::kShowBookmarkBar);
  }
 
-@@ -5804,6 +5829,11 @@ bool BrowserView::IsLocationBarVisible() const {
-   // MetaChat: hide location bar in --metachat-mode (WebUI handles nav).
-+  if (IsMetachatModeEnabled()) {
-+    return false;
-+  }
+@@ -5804,6 +5822,10 @@ bool BrowserView::IsLocationBarVisible() const {
+   // MetaChat: hide location bar (WebUI handles navigation).
++  if (IsMetachatModeEnabled()) { return false; }
    if (browser_->is_type_app_popup() || browser_->is_type_app() ||
        browser_->is_type_devtools()) {
      return false;
    }
 
-@@ -5959,6 +5989,11 @@ bool BrowserView::IsToolbarVisible() const {
-   // MetaChat: hide toolbar in --metachat-mode.
-+  if (IsMetachatModeEnabled()) {
-+    return false;
-+  }
+@@ -5959,6 +5981,10 @@ bool BrowserView::IsToolbarVisible() const {
+   // MetaChat: hide toolbar.
++  if (IsMetachatModeEnabled()) { return false; }
    if (browser_->is_type_app_popup() || browser_->is_type_app() ||
        browser_->is_type_devtools()) {
      return false;
@@ -282,7 +374,7 @@ diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.cc b/chrome/
        std::make_unique<LocationIconView>(omnibox_chip_font_list, this, this);
    location_icon_view->set_drag_controller(this);
    location_icon_view_ = AddChildView(std::move(location_icon_view));
-+  // MetaChat: in --metachat-mode, hide the location icon (page-info popup).
++  // MetaChat: hide location icon (page-info popup).
 +  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
 +          switches::kMetachatMode)) {
 +    location_icon_view_->SetVisible(false);
