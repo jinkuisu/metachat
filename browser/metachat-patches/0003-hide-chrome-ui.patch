@@ -1,0 +1,249 @@
+// MetaChat: hide native Chrome UI when --metachat-mode is active.
+// Blocks commands (bookmarks/history/downloads/settings/etc.),
+// hides the tab strip, location bar, bookmarks bar, and app menu.
+// Uses IsMetachatModeBlockedCommand() as a centralized gate, checked in
+// BrowserCommandController (Supports/IsEnabled/Execute), plus visibility
+// overrides in BrowserView and LocationBarView.
+
+diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
+--- a/chrome/browser/ui/browser_command_controller.cc
++++ b/chrome/browser/ui/browser_command_controller.cc
+@@ -26,6 +26,7 @@
+ #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
+ #include "chrome/browser/ui/commander/commander.h"
+ #include "chrome/browser/ui/global_error/global_error_service_factory.h"
++#include "chrome/common/chrome_switches.h"
+ #include "chrome/common/pref_names.h"
+ #include "components/prefs/pref_service.h"
+ #include "content/public/browser/navigation_controller.h"
+@@ -219,6 +220,108 @@ void AppInfoDialogClosedCallback(SessionID session_id,
+   }
+ }
+
++// MetaChat: centralized command gate for --metachat-mode. Blocks all native
++// Chrome UI commands that are irrelevant to the messaging-browser experience.
++// Checked in SupportsCommand, IsCommandEnabled, ExecuteCommand, and
++// ExecuteCommandWithDisposition. Modeled after ChromiumFish's
++// IsLightweightForkBlockedCommand but gated on --metachat-mode.
++bool IsMetachatModeBlockedCommand(int id) {
++  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
++          switches::kMetachatMode)) {
++    return false;
++  }
++  switch (id) {
++    // File/host integration.
++    case IDC_OPEN_FILE:
++    case IDC_SAVE_PAGE:
++    case IDC_PRINT:
++#if BUILDFLAG(ENABLE_PRINTING)
++    case IDC_BASIC_PRINT:
++#endif
++    // Bookmarks, history, downloads, reading list.
++    case IDC_BOOKMARK_THIS_TAB:
++    case IDC_BOOKMARK_ALL_TABS:
++    case IDC_BOOKMARKS_MENU:
++    case IDC_SHOW_BOOKMARK_BAR:
++    case IDC_SHOW_BOOKMARK_MANAGER:
++    case IDC_SHOW_BOOKMARK_SIDE_PANEL:
++    case IDC_SHOW_HISTORY:
++    case IDC_SHOW_HISTORY_SIDE_PANEL:
++    case IDC_SHOW_HISTORY_CLUSTERS_SIDE_PANEL:
++    case IDC_SHOW_DOWNLOADS:
++    case IDC_RECENT_TABS_MENU:
++    case IDC_RECENT_TABS_LOGIN_FOR_DEVICE_TABS:
++    case IDC_RECENT_TABS_SEE_DEVICE_TABS:
++    case IDC_READING_LIST_MENU:
++    case IDC_READING_LIST_MENU_ADD_TAB:
++    case IDC_READING_LIST_MENU_SHOW_UI:
++    // Settings, help, feedback, profile, sync.
++    case IDC_OPTIONS:
++    case IDC_PERFORMANCE:
++    case IDC_IMPORT_SETTINGS:
++    case IDC_CLEAR_BROWSING_DATA:
++    case IDC_ABOUT:
++    case IDC_HELP_MENU:
++    case IDC_HELP_PAGE_VIA_KEYBOARD:
++    case IDC_HELP_PAGE_VIA_MENU:
++    case IDC_FEEDBACK:
++    case IDC_SHOW_AVATAR_MENU:
++    case IDC_PROFILE_MENU_IN_APP_MENU:
++    case IDC_CLOSE_PROFILE:
++    case IDC_OPEN_GUEST_PROFILE:
++    case IDC_ADD_NEW_PROFILE:
++    case IDC_MANAGE_CHROME_PROFILES:
++    case IDC_SHOW_SIGNIN:
++    case IDC_MANAGE_GOOGLE_ACCOUNT:
++    // Extensions and Chrome Web Store.
++    case IDC_MANAGE_EXTENSIONS:
++    case IDC_SAFETY_HUB_MANAGE_EXTENSIONS:
++    case IDC_EXTENSIONS_SUBMENU_MANAGE_EXTENSIONS:
++    case IDC_EXTENSIONS_SUBMENU_VISIT_CHROME_WEB_STORE:
++    // Password manager, autofill, safety hub.
++    case IDC_SHOW_PASSWORD_MANAGER:
++    case IDC_SAFETY_HUB_SHOW_PASSWORD_CHECKUP:
++    case IDC_SHOW_PAYMENT_METHODS:
++    case IDC_SHOW_ADDRESSES:
++    // Translation, casting, PWAs.
++    case IDC_SHOW_TRANSLATE:
++    case IDC_CONTENT_CONTEXT_TRANSLATE:
++    case IDC_ROUTE_MEDIA:
++    case IDC_LIVE_CAPTION:
++    case IDC_INSTALL_PWA:
++    case IDC_CREATE_SHORTCUT:
++    case IDC_OPEN_IN_PWA_WINDOW:
++    case IDC_WEB_APP_SETTINGS:
++    // Update / what's-new / tips.
++    case IDC_UPGRADE_DIALOG:
++    case IDC_CHROME_WHATS_NEW:
++    case IDC_CHROME_TIPS:
++      return true;
++    default:
++      return false;
++  }
++}
++
+ bool CanOpenFile(Browser* browser) {
+   if (browser->is_type_devtools() || browser->is_type_app() ||
+       browser->is_type_app_popup()) {
+@@ -580,15 +683,24 @@ void BrowserCommandController::ShowCustomizeChromeSidePanel(
+ // BrowserCommandController, CommandUpdater implementation:
+
+ bool BrowserCommandController::SupportsCommand(int id) const {
++  if (IsMetachatModeBlockedCommand(id)) {
++    return false;
++  }
+   return command_updater_.SupportsCommand(id);
+ }
+
+ bool BrowserCommandController::IsCommandEnabled(int id) const {
++  if (IsMetachatModeBlockedCommand(id)) {
++    return false;
++  }
+   return command_updater_.IsCommandEnabled(id);
+ }
+
+ bool BrowserCommandController::ExecuteCommand(int id,
+                                               base::TimeTicks time_stamp) {
++  if (IsMetachatModeBlockedCommand(id)) {
++    return false;
++  }
+   return ExecuteCommandWithDisposition(id, WindowOpenDisposition::CURRENT_TAB,
+                                        time_stamp);
+ }
+
+@@ -597,6 +709,9 @@ bool BrowserCommandController::ExecuteCommandWithDisposition(
+     int id,
+     WindowOpenDisposition disposition,
+     base::TimeTicks time_stamp) {
++  if (IsMetachatModeBlockedCommand(id)) {
++    return false;
++  }
+   // Doesn't go through the command_updater_ to avoid dealing with having a
+   // naming collision for ExecuteCommandWithDisposition (both
+   // CommandUpdaterDelegate and CommandUpdater declare this function so we
+
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -38,6 +38,7 @@
+ #include "chrome/browser/ui/webui/top_chrome/preload_timeout_bubble.h"
+ #include "chrome/browser/ui/webui/top_chrome/webui_contents_preload_manager.h"
+ #include "chrome/common/chrome_features.h"
++#include "chrome/common/chrome_switches.h"
+ #include "chrome/common/url_constants.h"
+ #include "chrome/grit/branded_strings.h"
+ #include "chrome/grit/generated_resources.h"
+@@ -146,6 +147,18 @@ BrowserView::BrowserView(std::unique_ptr<Browser> browser)
+       // frame. This must be done early in BrowserView's lifecycle, before
+       // BrowserFrame::InitBrowserFrame is called.
+       if (browser_->is_type_app_popup()) {
++        // MetaChat: in --metachat-mode, make the browser window use a
++        // frameless window style (no title bar decorations). Combined with
++        // hiding the tab strip and toolbar below, this gives a clean
++        // content-only window ready for the MetaChat WebUI overlay.
++        if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++                switches::kMetachatMode)) {
++          set_frame_type(WidgetFrameType::kFullscreen);
++          set_force_google_ui(false);
++          SetShowTitleBar(false);
++          SetShowIcon(false);
++          continue;
++        }
+         set_frame_type(WidgetFrameType::kFullscreen);
+         set_force_google_ui(false);
+       }
+@@ -5090,6 +5103,19 @@ bool BrowserView::ShouldShowTabStrip() const {
+ // MetaChat: local helper to check metachat-mode.
+ bool IsMetachatModeEnabled() {
+   return base::CommandLine::ForCurrentProcess()->HasSwitch(
++      switches::kMetachatMode);
++}
++
++bool BrowserView::ShouldShowTabStrip() const {
++  // MetaChat: hide tab strip in --metachat-mode. Tabs are managed by the
++  // WebContents Manager (see 0005) and switched via the MetaChat WebUI.
++  if (IsMetachatModeEnabled()) {
++    return false;
++  }
+   // Original logic preserved below.
+   return browser_->SupportsWindowFeature(
+       Browser::WindowFeature::kFeatureTabstrip);
+ }
+
+@@ -5109,6 +5135,11 @@ bool BrowserView::ShouldShowBookmarkBar(
+     std::optional<ShowBookmarkBarWhileAnimating> show_bookmark_bar_while_animating)
+     const {
++  // MetaChat: hide bookmarks bar in --metachat-mode.
++  if (IsMetachatModeEnabled()) {
++    return false;
++  }
+   return browser_->SupportsWindowFeature(
+       Browser::WindowFeature::kFeatureBookmarkBar) &&
+       !browser_->profile()->GetPrefs()->GetBoolean(
+           bookmarks::prefs::kShowBookmarkBar);
+ }
+
+@@ -5804,6 +5835,11 @@ bool BrowserView::IsLocationBarVisible() const {
+   // WebUI overlay, do not let native location bar compete for screen space.
++  if (IsMetachatModeEnabled()) {
++    return false;
++  }
+   if (browser_->is_type_app_popup() || browser_->is_type_app() ||
+       browser_->is_type_devtools()) {
+     return false;
+   }
+
+@@ -5959,6 +5995,11 @@ bool BrowserView::IsToolbarVisible() const {
+   // MetaChat: hide toolbar in --metachat-mode.
++  if (IsMetachatModeEnabled()) {
++    return false;
++  }
+   if (browser_->is_type_app_popup() || browser_->is_type_app() ||
+       browser_->is_type_devtools()) {
+     return false;
+   }
+
+diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.cc b/chrome/browser/ui/views/location_bar/location_bar_view.cc
+--- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
++++ b/chrome/browser/ui/views/location_bar/location_bar_view.cc
+@@ -15,6 +15,7 @@
+ #include "chrome/browser/ui/views/location_bar/location_icon_view.h"
+ #include "chrome/browser/ui/views/location_bar/selected_keyword_view.h"
+ #include "chrome/browser/ui/views/omnibox/omnibox_view_views.h"
++#include "chrome/common/chrome_switches.h"
+ #include "chrome/grit/generated_resources.h"
+ #include "components/dom_distiller/core/dom_distiller_features.h"
+ #include "components/omnibox/browser/location_bar_model_impl.h"
+@@ -330,6 +331,11 @@ void LocationBarView::Init() {
+       std::make_unique<LocationIconView>(omnibox_chip_font_list, this, this);
+   location_icon_view->set_drag_controller(this);
+   location_icon_view_ = AddChildView(std::move(location_icon_view));
++  // MetaChat: in --metachat-mode, hide the location icon view (page info).
++  // Keep the object alive to satisfy internal references; just make invisible.
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          switches::kMetachatMode)) {
++    location_icon_view_->SetVisible(false);
++  }
+   // The security chip icon must be added after children so that its
+   // z-order puts it on top of the children drawn to its left and right.
+   // TODO(crbug.com/40263989): Remove this after crbug.com/40263989 fix.
