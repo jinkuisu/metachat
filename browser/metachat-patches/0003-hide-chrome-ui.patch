@@ -3,25 +3,46 @@
 // Configure via --metachat-mode-blocklist and --metachat-mode-allowlist.
 // Both accept comma-separated IDC command names (e.g. "IDC_PRINT,IDC_SAVE_PAGE").
 //
+// == 重要说明：拦截范围 ==
+// 以下拦截的均是 Chrome 原生 UI 菜单项/快捷键命令（IDC_*），
+// 对应的是操作系统的功能入口（菜单栏、工具栏按钮、快捷键）。
+// 网页（如 WhatsApp Web、Telegram Web）内部的功能完全不受影响：
+//
+//   操作                         是否受影响
+//   -------------------------------------------------------------
+//   WhatsApp 发图片/文件/视频         [NO] 不受影响（走 input[type=file]）
+//   WhatsApp 右键保存图片             [NO] 不受影响（走 canvas/Blob API）
+//   WhatsApp 自动填充密码             [NO] 不受影响（Blink 内置，不走命令 ID）
+//   WhatsApp window.print() 打印      [NO] 不受影响（不走 IDC_PRINT）
+//   WhatsApp 通知/消息提醒            [NO] 不受影响（Web Notification API）
+//   WhatsApp 音视频通话               [NO] 不受影响（WebRTC API）
+//   WhatsApp 剪贴板操作               [NO] 不受影响（Clipboard API）
+//   Ctrl+C/V/X/Ctrl+A                [NO] 不受影响（保留）
+//   浏览器内打开本地文件 (Ctrl+O)     [OK] 被拦截（IDC_OPEN_FILE）
+//   浏览器内保存网页 (Ctrl+S)         [OK] 被拦截（IDC_SAVE_PAGE）
+//   浏览器打印 (Ctrl+P)               [OK] 被拦截（IDC_PRINT）
+//   清除浏览数据 (Ctrl+Shift+Del)     [OK] 被拦截（IDC_CLEAR_BROWSING_DATA）
+//
 // == Default Blocklist (blocked commands in --metachat-mode) ==
+// 这些命令在 --metachat-mode 下被拦截，但网页内部对应功能不受影响。
 //
 // File & Page:
-//   IDC_OPEN_FILE          打开文件对话框 (Ctrl+O)
-//   IDC_SAVE_PAGE          保存网页 (Ctrl+S)
-//   IDC_PRINT              打印 (Ctrl+P)
+//   IDC_OPEN_FILE          打开文件对话框 (Ctrl+O) — 网页内<input>不受影响
+//   IDC_SAVE_PAGE          保存网页 (Ctrl+S) — 网页内下载不受影响
+//   IDC_PRINT              打印 (Ctrl+P) — 网页内 window.print() 不受影响
 //   IDC_BASIC_PRINT        基本打印（无预览）
 //
 // Bookmarks & History:
 //   IDC_BOOKMARK_THIS_TAB  为当前页加书签 (Ctrl+D)
 //   IDC_BOOKMARK_ALL_TABS  为所有标签页加书签
 //   IDC_BOOKMARKS_MENU     书签菜单
-//   IDC_SHOW_BOOKMARK_BAR  显示/隐藏书签栏 (Ctrl+Shift+B)
+//   IDC_SHOW_BOOKMARK_BAR  显示书签栏 (Ctrl+Shift+B)
 //   IDC_SHOW_BOOKMARK_MANAGER 书签管理器 (Ctrl+Shift+O)
 //   IDC_SHOW_BOOKMARK_SIDE_PANEL 书签侧面板
 //   IDC_SHOW_HISTORY       历史记录 (Ctrl+H)
 //   IDC_SHOW_HISTORY_SIDE_PANEL 历史侧面板
 //   IDC_SHOW_HISTORY_CLUSTERS_SIDE_PANEL 历史聚类侧面板
-//   IDC_SHOW_DOWNLOADS     下载内容 (Ctrl+J)
+//   IDC_SHOW_DOWNLOADS     下载内容 (Ctrl+J) — 网页内下载不受影响
 //   IDC_RECENT_TABS_MENU   最近关闭的标签页
 //   IDC_READING_LIST_MENU  阅读清单
 //
@@ -43,10 +64,10 @@
 //   IDC_MANAGE_GOOGLE_ACCOUNT 管理 Google 账户
 //
 // Password & Autofill:
-//   IDC_SHOW_PASSWORD_MANAGER 密码管理器
-//   IDC_SAFETY_HUB_SHOW_PASSWORD_CHECKUP 密码安全检查
-//   IDC_SHOW_PAYMENT_METHODS 付款方式
-//   IDC_SHOW_ADDRESSES     地址管理
+//   IDC_SHOW_PASSWORD_MANAGER 密码管理器入口 — 网页自动填充不受影响
+//   IDC_SAFETY_HUB_SHOW_PASSWORD_CHECKUP 密码安全检查入口
+//   IDC_SHOW_PAYMENT_METHODS 付款方式入口
+//   IDC_SHOW_ADDRESSES     地址管理入口
 //
 // Side Panels & Customize:
 //   IDC_SHOW_COMMENTS_SIDE_PANEL 评论侧面板
@@ -56,9 +77,9 @@
 //   IDC_SHOW_CHROME_LABS   Chrome Labs 实验功能
 //
 // Translation & Media:
-//   IDC_SHOW_TRANSLATE     翻译此页
-//   IDC_CONTENT_CONTEXT_TRANSLATE 右键菜单翻译
-//   IDC_ROUTE_MEDIA        投屏/投放
+//   IDC_SHOW_TRANSLATE     翻译此页 — 网页内翻译插件不受影响
+//   IDC_CONTENT_CONTEXT_TRANSLATE 右键菜单翻译入口
+//   IDC_ROUTE_MEDIA        投屏/投放 — 网页内 WebRTC 不受影响
 //   IDC_LIVE_CAPTION       实时字幕
 //
 // PWA & Web Apps:
@@ -71,28 +92,39 @@
 //   IDC_UPGRADE_DIALOG     升级对话框
 //   IDC_CHROME_WHATS_NEW   新功能页面
 //   IDC_CHROME_TIPS        Chrome 使用技巧
-//
-// == Preserved (NOT blocked) ==
+
+// == Preserved (NOT blocked, remain fully functional) ==
 //
 // Navigation:
 //   IDC_RELOAD              刷新页面 (F5 / Ctrl+R)
 //   IDC_RELOAD_BYPASSING_CACHE 强制刷新 (Ctrl+Shift+R)
 //   IDC_RELOAD_CLEARING_CACHE 清缓存刷新
+//   IDC_BACK / IDC_FORWARD  前进/后退 (Alt+Left/Right)
+//   IDC_STOP                停止加载 (Esc)
 //
 // Tab Management:
 //   IDC_NEW_TAB             新建标签页 (Ctrl+T)
 //   IDC_CLOSE_TAB           关闭标签页 (Ctrl+W)
 //   IDC_RESTORE_TAB         恢复关闭的标签页 (Ctrl+Shift+T)
+//   IDC_SELECT_NEXT_TAB     下一个标签页 (Ctrl+Tab)
+//   IDC_SELECT_PREVIOUS_TAB 上一个标签页 (Ctrl+Shift+Tab)
+//   IDC_MOVE_TAB_NEXT       移动标签页到右边
+//   IDC_MOVE_TAB_PREVIOUS   移动标签页到左边
+//   IDC_DUPLICATE_TAB       复制标签页
 //
 // Window Management:
 //   IDC_NEW_WINDOW          新建窗口 (Ctrl+N)
 //   IDC_NEW_INCOGNITO_WINDOW 新建无痕窗口 (Ctrl+Shift+N)
 //   IDC_FULLSCREEN          全屏 (F11)
-//   IDC_EXIT                退出
+//   IDC_MINIMIZE_WINDOW     最小化窗口
+//   IDC_MAXIMIZE_WINDOW     最大化窗口
+//   IDC_CLOSE_WINDOW        关闭窗口
+//   IDC_EXIT                退出 (Ctrl+Shift+Q)
 //
 // Developer Tools:
-//   IDC_DEV_TOOLS           开发者工具 (F12)
+//   IDC_DEV_TOOLS           开发者工具 (F12 / Ctrl+Shift+I)
 //   IDC_DEV_TOOLS_CONSOLE   控制台 (Ctrl+Shift+J)
+//   IDC_DEV_TOOLS_INSPECT   审查元素 (Ctrl+Shift+C)
 //   IDC_TASK_MANAGER        任务管理器 (Shift+Esc)
 //   IDC_VIEW_SOURCE         查看网页源码 (Ctrl+U)
 //
@@ -104,16 +136,36 @@
 //
 // Page Actions:
 //   IDC_FIND               查找 (Ctrl+F)
+//   IDC_FIND_NEXT          查找下一个 (Ctrl+G / F3)
+//   IDC_FIND_PREVIOUS      查找上一个 (Ctrl+Shift+G)
 //   IDC_ZOOM_PLUS          放大 (Ctrl++)
 //   IDC_ZOOM_MINUS         缩小 (Ctrl+-)
 //   IDC_ZOOM_NORMAL        重置缩放 (Ctrl+0)
+//   IDC_FOCUS_LOCATION     聚焦地址栏 (Ctrl+L / F6 / Alt+D)
+//   IDC_FOCUS_TOOLBAR      聚焦工具栏
+//   IDC_FOCUS_MENU_BAR     聚焦菜单栏
+//   IDC_FOCUS_BOOKMARKS    聚焦书签栏
 //   IDC_COPY_URL           复制网址
+//   IDC_EMAIL_PAGE_LOCATION 通过邮件分享链接
 //
 // Edit:
-//   IDC_CUT / IDC_COPY / IDC_PASTE  剪贴板操作
+//   IDC_CUT / IDC_COPY / IDC_PASTE  剪贴板操作 (网页内也完全正常)
 //   IDC_UNDO / IDC_REDO             撤销/重做
-//   IDC_SELECT_ALL                  全选
+//   IDC_SELECT_ALL                  全选 (Ctrl+A)
 //   IDC_DELETE                      删除
+
+// == Preserved command groups rationale ==
+// These groups are preserved because they serve essential browser functions
+// that complement the messaging-browser UX:
+//   a) Navigation: reload, back/forward — core browser behavior
+//   b) Tab management: new/close/switch tabs — multi-account switching
+//   c) Window management: new window, fullscreen, exit — window lifecycle
+//   d) Developer tools: devtools, console, view source — debugging
+//   e) Extensions: manage extensions, CWS — per-account extension loading
+//   f) Page actions: find, zoom, copy URL — productivity
+//   g) Edit: cut/copy/paste/undo/redo — standard editing
+
+
 
 diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
 --- a/chrome/browser/ui/browser_command_controller.cc
