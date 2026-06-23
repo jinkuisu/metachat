@@ -11,7 +11,7 @@ index 0d60244742506..4dfc4636dad74 100644
 +  // so report kPointerFineType. Without this, headless Ozone (no real input
 +  // device) reports kPointerNone, and CSS @media (pointer: fine) evaluates
 +  // false even though navigator.userAgent says "Windows NT 10.0; Win64".
-+  // Bot detectors (CreepJS, fpjs) cross-check: UA=desktop + pointer=none =>
++  // Bot detectors (a fingerprinting test page, the fingerprinter) cross-check: UA=desktop + pointer=none =>
 +  // headless/automated. Override at the MediaValues layer so all four
 +  // (any-pointer, pointer, any-hover, hover) match real Win Chrome.
 +  return mojom::blink::PointerType::kPointerFineType;
@@ -336,7 +336,7 @@ index 8f88c4c102d62..843920c65cb16 100644
 +  // Persona-mode: force classic-style scrollbars even on macOS so that
 +  // div.offsetWidth > div.clientWidth for overflow:scroll elements (i.e.
 +  // scrollbars take layout width like they do on Windows/Linux). Defeats
-+  // the FingerprintJS Pro signal s204 (rt()) that creates a hidden
++  // the commercial fingerprinters signal s204 (rt()) that creates a hidden
 +  // overflow:scroll div and infers Mac vs Win from offsetWidth ===
 +  // clientWidth. The fork's persona claims Windows; this was the single
 +  // biggest "platform != UA" inconsistency at the layout layer.

@@ -241,7 +241,7 @@ index eb17bebfeedce..1fc39d1059f09 100644
  
 +// Lightweight-fork: we RESTORED `navigator.keyboard` on the prototype.
 +// Hiding it shrank Navigator.prototype below the expected ~82-property
-+// count that fpjs Pro reads for Browser-Tampering detection. Better
++// count that commercial fingerprinters reads for Browser-Tampering detection. Better
 +// strategy: keep the attribute visible, but neutralise high-entropy
 +// leaks at the Keyboard impl layer (getLayoutMap returns a canonical
 +// US-QWERTY map regardless of host physical layout) — see the map built
@@ -270,7 +270,7 @@ index 8d900f227005d..368d33d9c9f65 100644
 +//   * >60fps at >1080p → not smooth
 +//   * Bitrate >50 Mbps at 1080p+ → not powerEfficient
 +//
-+// Returns a fixed pair regardless of host hardware so fpjs and similar
++// Returns a fixed pair regardless of host hardware so the fingerprinter and similar
 +// see the same per-persona values on every host.
 +struct PerfHeuristic {
 +  bool smooth;
@@ -372,7 +372,7 @@ index 8d900f227005d..368d33d9c9f65 100644
 +  // Lightweight-fork: instead of querying the host's VideoDecodePerfHistory
 +  // (which leaks host-specific perf signals), return a CODEC + RESOLUTION +
 +  // BITRATE-aware smooth/powerEfficient verdict via DerivePerformanceHeuristic.
-+  // Earlier we returned `true/true/true` for every valid config — fpjs Pro
++  // Earlier we returned `true/true/true` for every valid config — commercial fingerprinters
 +  // probed ~15 configs per fingerprint scan and noticed we said "smooth +
 +  // powerEfficient" even for 8K AV1 etc. that NO consumer GPU can decode
 +  // smoothly. That uniformly-yes answer is itself a tell. The heuristic now
@@ -391,7 +391,7 @@ index 15224cae5caba..8ca95b1df81a4 100644
  // https://wicg.github.io/netinfo/#navigatornetworkinformation-interface
  
 +// Lightweight-fork: we RESTORED `navigator.connection`. Hiding it shrank
-+// Navigator.prototype below ~82 properties (fpjs Pro reads the
++// Navigator.prototype below ~82 properties (commercial fingerprinters reads the
 +// enumeration as a Browser-Tampering signal). Better strategy: keep the
 +// attribute visible, but the NetworkInformation impl returns canonical
 +// low-entropy values (effectiveType="4g", downlink=10, rtt=50,
@@ -444,7 +444,7 @@ index 976a3c8c36dbf..404c2fa849d40 100644
 -    return GetNetworkStateNotifier().MaxBandwidth();
 +// Lightweight-fork: NetworkInformation values are now canonical so the
 +// 4-tuple (effectiveType, downlink, rtt, saveData) reads the same on every
-+// host. Reason: fpjs Pro + similar reads this tuple as a near-unique
++// host. Reason: commercial fingerprinters + similar reads this tuple as a near-unique
 +// fingerprint (real values vary per actual link). Returning fixed
 +// "typical desktop 4G" values puts every fork instance in the same
 +// anonymity bucket without contradicting our Win-Chrome persona.
@@ -606,7 +606,7 @@ index 9d155705c1350..57c0f90549119 100644
 -  return vendor_;
 +  // 2026-05-30: Persona-mode spoof. Real Chrome 148 on a Win desktop
 +  // with Intel UHD 770 reports vendor="intel". Our SwiftShader backing
-+  // reports vendor="google", which fpjs / Cloudflare flag as anti-
++  // reports vendor="google", which the fingerprinter / bot-detection services flag as anti-
 +  // detect (WebGL says Intel but WebGPU says SwiftShader = inconsistent).
 +  // Lock vendor (and architecture, below) to "intel" so they stop
 +  // contradicting the WebGL Intel claim. NOTE: only vendor + architecture

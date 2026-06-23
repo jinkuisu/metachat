@@ -2138,7 +2138,7 @@ index 0000000000000..79e74cd3e5cef
 +
 +  /* =========================================================================
 +   * WebGL bridge ops. Mirrors WebGLOp in canvas-bridge/proto/src/lib.rs.
-+   * Subset chosen to cover what fpjs Pro / CF Turnstile probe: state
++   * Subset chosen to cover what commercial fingerprinters / bot-detection services probe: state
 +   * setup, shader compile + program link, attribute + uniform binding,
 +   * draw, readPixels. Each op refers to a CanvasId created via CreateWebGL
 +   * (vs CreateCanvas2D for 2D contexts). The client draws both kinds from a

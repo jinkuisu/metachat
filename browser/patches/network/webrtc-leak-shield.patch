@@ -33,7 +33,7 @@ index 14232136193ff..491c85a56a9cc 100644
 +    }
 +    // WebRTC ICE gathering: keep UDP completely off the public network.
 +    //
-+    // EMPIRICAL 2026-05-30 from CreepJS run: with
++    // EMPIRICAL 2026-05-30 from a fingerprinting test page run: with
 +    // `default_public_interface_only` the STUN srflx candidate
 +    // still emitted the cloud VPS's actual IP (203.0.113.7)
 +    // because the HTTP/HTTPS proxy at the browser layer doesn't
@@ -87,8 +87,8 @@ index 14232136193ff..491c85a56a9cc 100644
 +    // WebGPU: real Chrome 148 on a desktop exposes navigator.gpu and
 +    // its constructors. Without these flags Chromium gates on adapter
 +    // availability and SwiftShader doesn't provide one, so
-+    // navigator.gpu ends up undefined — fpjs Pro / Cloudflare
-+    // Turnstile flag this absence as anti-detect.
++    // navigator.gpu ends up undefined — commercial fingerprinters / bot-detection services
++    // both flag this absence as anti-detect.
 +    if (!mutable_cmd_line->HasSwitch("enable-unsafe-webgpu")) {
 +      mutable_cmd_line->AppendSwitch("enable-unsafe-webgpu");
 +    }
@@ -113,11 +113,11 @@ index 14232136193ff..491c85a56a9cc 100644
 +    // VPS → Europe/Berlin, Singapore VPS → Asia/Singapore, etc.), which
 +    // leaks into JS via Intl.DateTimeFormat().resolvedOptions().timeZone.
 +    //
-+    // fpjs Pro cross-references that JS-reported timezone with the IP
++    // commercial fingerprinters cross-references that JS-reported timezone with the IP
 +    // geolocation. A Win persona running through a US proxy but
 +    // reporting timezone=Europe/Berlin gets flagged
 +    // vpn_origin_timezone="Europe/Berlin" + vpn=true with high
-+    // confidence. Cloudflare Turnstile uses the same pivot.
++    // confidence. bot-detection services uses the same pivot.
 +    //
 +    // Default to America/New_York when the operator hasn't pinned TZ
 +    // — matches the Win-US persona this fork ships, and avoids the
@@ -233,10 +233,10 @@ index 1d85fe3c79b61..6cd79827cd003 100644
 +  // empirically Chromium 150 still emits srflx and prflx UDP candidates
 +  // whose IP is the raw host public address (verified 2026-05-31 on the
 +  // Linux VPS — srflx address=203.0.113.7 with raddr=0.0.0.0). This is
-+  // the classic CreepJS / fpjs / IPLeak.net WebRTC leak: page reads
++  // the classic a fingerprinting test page / the fingerprinter / a WebRTC leak test WebRTC leak: page reads
 +  // candidate.address, gets the real interface IP, cross-checks against
 +  // the page's TCP IP (proxy IP), and flags the proxy with high
-+  // confidence. CF Turnstile uses the same pivot for VPN detection.
++  // confidence. bot-detection services uses the same pivot for VPN detection.
 +  //
 +  // Mirror the policy at the candidate-dispatch layer: drop srflx and
 +  // prflx UDP candidates entirely. mDNS host candidates (.local) still

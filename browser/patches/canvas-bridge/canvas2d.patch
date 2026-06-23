@@ -116,7 +116,7 @@ index 3d2c354897fad..890087fca42a0 100644
    static float GetFontBaseline(const V8CanvasTextBaseline::Enum,
                                 const SimpleFontData&);
  
-+  // canvas-bridge: overwrite the metrics that CF Turnstile's font probe
++  // canvas-bridge: overwrite the metrics that bot-detection services's font probe
 +  // reads (width + actualBoundingBox ascent/descent + fontBoundingBox
 +  // ascent/descent). Called after the normal local-shaper construction
 +  // with values from the remote render server's native font metrics (e.g.
@@ -173,7 +173,7 @@ index 1422fe89b171d..1ab38296b988d 100644
 +  // real-Win-Chrome bytes — we explicitly DO NOT apply the per-persona
 +  // noise to them below (see the omitted `else if (bridge_readback_done)`
 +  // branch), because that noise destroys the byte-exact match against
-+  // real Chrome that Cloudflare Turnstile and similar checks expect.
++  // real Chrome that bot-detection services and similar checks expect.
 +  // The per-persona isolation noise is for the LOCAL snapshot path only,
 +  // which is used when the bridge is unavailable.
 +  bool bridge_readback_done = false;
@@ -206,7 +206,7 @@ index 1422fe89b171d..1ab38296b988d 100644
 -  }
 +    // Local-path 2-bit per-(coord, persona) noise removed: the noise made
 +    // toDataURL output 2.3× larger (poor PNG compression of noisy pixels)
-+    // and flipped every constant pixel by ±2, which Cloudflare Turnstile
++    // and flipped every constant pixel by ±2, which bot-detection services
 +    // detects by comparing against the known real-Chrome-148 + WARP
 +    // canvas hash. The previous architecture relied on canvas-bridge
 +    // returning authoritative Win pixels for cross-site identity;
@@ -316,7 +316,7 @@ index 1422fe89b171d..1ab38296b988d 100644
        host->GetPlainTextPainter());
 +
 +  // canvas-bridge: if the bridge is up, ask the remote render server for
-+  // its native font metrics and overwrite the five fields CF Turnstile's
++  // its native font metrics and overwrite the five fields bot-detection services's
 +  // font fingerprint reads. Falls through to the local metrics on
 +  // disabled / timeout / parse failure.
 +  auto* bridge = blink::canvas_bridge::CanvasBridgeClient::Get();

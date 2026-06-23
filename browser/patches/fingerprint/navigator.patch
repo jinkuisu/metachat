@@ -9,7 +9,7 @@ index e177eded759db..91ad0c23590f4 100644
 +//
 +// 2026-05-31: Persona-mode override. We add IS_LINUX so the fork
 +// (which spoofs as Windows desktop via UA + sec-ch-ua-platform)
-+// also exposes navigator.share / navigator.canShare. CreepJS flags
++// also exposes navigator.share / navigator.canShare. a fingerprinting test page flags
 +// noWebShare=true as part of its "Like Headless" heuristic, and
 +// real Win Chrome 148 always exposes the API surface (even if
 +// share() itself rejects with NotAllowedError on systems with no
@@ -85,7 +85,7 @@ index 608bea5cb3864..cd3a44bc25f95 100644
 -  }
 +  // Persona-mode: deliberately DROP the "Headless" UA token even when
 +  // --headless is on. Upstream prepends it (giving "HeadlessChrome/N..."),
-+  // which FingerprintJS Pro reads via the HTTP User-Agent header and
++  // which commercial fingerprinters reads via the HTTP User-Agent header and
 +  // classifies as bot_type=headless_chrome regardless of how clean the
 +  // JS-side navigator.userAgent is. The fork's persona claims a regular
 +  // Chrome install; the HTTP UA must match.
@@ -180,7 +180,7 @@ index 608bea5cb3864..cd3a44bc25f95 100644
 +  // Persona-mode: use the claimed full version, not the real build
 +  // version. version_info::GetVersionNumber() returns the actual fork
 +  // build (e.g. 150.0.7844.0) and leaks via Sec-CH-UA-Full-Version on
-+  // Accept-CH opt-in requests — directly observable to CF managed
++  // Accept-CH opt-in requests — directly observable to managed bot
 +  // challenges. Pin to the persona's claimed full version so the high-
 +  // entropy hint matches what the low-entropy sec-ch-ua already claims.
 +  metadata.full_version = blink::fingerprinting::Current().chrome_full_version;
@@ -254,7 +254,7 @@ index a3f5649de4219..38437864c7d0a 100644
 +  // CDP, both pages on https://example.com/ secure context) proved the
 +  // opposite: real Chrome 148 exposes all of those. Trimming them made
 +  // our fork advertise a stripped Navigator that didn't match ANY real
-+  // Chrome version — instant anti-detect tell for Cloudflare Turnstile.
++  // Chrome version — instant anti-detect tell for bot-detection services.
 +  //
 +  // Verified actual diff (Chromium 150 source − Chrome 148 stable):
 +  //   * Element.prototype:        'pseudo'
@@ -305,7 +305,7 @@ index 0c53e924a914f..4aa18f0384e58 100644
 +  // open was an anti-detect tell — a page calls
 +  // `el.attachShadow({mode:'closed'})` then `el.shadowRoot` and real Chrome
 +  // returns null; our fork was returning the closed shadow root anyway.
-+  // CF Turnstile flags that as anti-detect tampering. Restoration is OS-
++  // bot-detection services flags that as anti-detect tampering. Restoration is OS-
 +  // neutral (closed-mode behavior is identical across Mac/Win Chrome).
  
    // If there's already a declarative shadow root, verify that the existing
@@ -329,8 +329,8 @@ index 29bf3ba733039..2befeece45c4b 100644
      [RaisesException, MeasureAs=ElementAttachShadow] ShadowRoot attachShadow(ShadowRootInit shadowRootInitDict);
 +    // Restored to upstream: element.shadowRoot returns only OPEN shadow
 +    // roots. Earlier we bound it to AuthorShadowRoot for inspection
-+    // convenience, but that exposed closed-mode trees to JS — a CF
-+    // Turnstile check that calls attachShadow({mode:'closed'}) then
++    // convenience, but that exposed closed-mode trees to JS — a bot
++    // detector's check that calls attachShadow({mode:'closed'}) then
 +    // reads .shadowRoot can detect the difference (real Chrome returns
 +    // null, fork returned the root). Restoration is OS-neutral.
      [PerWorldBindings, ImplementedAs=OpenShadowRoot] readonly attribute ShadowRoot? shadowRoot;
@@ -349,7 +349,7 @@ index 24e54a9c02041..357af2da5b6e7 100644
 +    // API entry point (Chrome 150+). Real Chrome 148 doesn't expose it,
 +    // so PermissionStatus.prototype.when (and every other EventTarget
 +    // subclass's .when) shows up only on the post-148 source we build
-+    // against. FingerprintJS Pro signal s211 counts EventTarget-derived
++    // against. commercial fingerprinters signal s211 counts EventTarget-derived
 +    // property hashes per permission — extra .when() pushes the bitmask
 +    // from 3 to 7 for every PermissionStatus. With when() removed from
 +    // the IDL it's no longer enumerable / accessible, matching real
@@ -446,7 +446,7 @@ index f442c8d8e331b..fb3a7e40060f4 100644
 +  // chrome. Real Chrome's outerHeight == innerHeight + tabbar+toolbar+
 +  // titlebar (~80-120px). Returning a fixed persona value (e.g. 1032)
 +  // while inner was the actual macOS window size produced a >100px
-+  // mystery gap that fpjs Pro flagged as "browser is lying about its
++  // mystery gap that commercial fingerprinters flagged as "browser is lying about its
 +  // size" — instant bot tell. OS-neutral: real Chrome on every desktop
 +  // OS has innerHeight = outerHeight - ~80-120.
 +  return innerHeight() + kCanonicalChromeHeight;
@@ -477,7 +477,7 @@ index f442c8d8e331b..fb3a7e40060f4 100644
 -  return chrome_client.RootWindowRect(*frame).width();
 +  // Real Chrome maximized has outerWidth == innerWidth (no left/right
 +  // chrome). Returning a fixed persona width while inner was the actual
-+  // macOS window viewport produced a ~200px gap that fpjs flagged.
++  // macOS window viewport produced a ~200px gap that the fingerprinter flagged.
 +  return innerWidth() + kCanonicalChromeWidth;
  }
  
@@ -604,8 +604,8 @@ index 583f05f8dd5fb..58a783b149e34 100644
 +  // per-profile pref isn't seeded from IDS_ACCEPT_LANGUAGES on a fresh
 +  // ephemeral profile, and network::features::kReduceAcceptLanguageCount /
 +  // GetLanguagesWithMaxCount paths can collapse multi-language lists further.
-+  // Single-element navigator.languages is a known bot tell (CF Turnstile and
-+  // fpjs both flag it as Tor-style stripping). Pin to "en-US,en" at the JS
++  // Single-element navigator.languages is a known bot tell (bot-detection services and
++  // the fingerprinter both flag it as Tor-style stripping). Pin to "en-US,en" at the JS
 +  // surface so both the .language getter (front element) and .languages
 +  // getter (full list) match real Chrome 148 byte-for-byte.
 +  return "en-US,en";
@@ -716,7 +716,7 @@ index 75cd3461317b7..f3fc99dc9ec7d 100644
 +    // Lightweight-fork: ReduceAcceptLanguage path stripped. Upstream reduces
 +    // navigator.languages to a single front element when the feature is
 +    // enabled — but real Chrome 148 stable ships with the feature OFF, so
-+    // ['en-US', 'en'] stays 2-element. Cloudflare Turnstile fingerprints
++    // ['en-US', 'en'] stays 2-element. bot-detection services fingerprints
 +    // navigator.languages.length and flags single-element as bot/anti-detect
 +    // (Tor-style stripping). Empirically our fork was hitting the reduction
 +    // path despite the upstream default being disabled (likely via field-
@@ -748,11 +748,11 @@ index db1a55d008e76..8ecf06cfabe2a 100644
 +  // 2026-05-30: Persona-mode override. Mirror Navigator::GetAcceptLanguages
 +  // for worker / worklet contexts so navigator.languages stays
 +  // ["en-US","en"] no matter where it is read (main thread, dedicated
-+  // worker, shared worker, service worker, worklet). fpjs Pro probes the
++  // worker, shared worker, service worker, worklet). commercial fingerprinters probes the
 +  // SDK from inside a sandboxed iframe and additionally cross-checks the
 +  // worker scope — without this patch the main-thread Navigator returned
 +  // ["en-US","en"] but the worker scope still resolved through the
-+  // network fetch context which can collapse to "en-US" alone, and fpjs
++  // network fetch context which can collapse to "en-US" alone, and the fingerprinter
 +  // flagged the mismatch as Tor-style stripping.
 +  return "en-US,en";
  }

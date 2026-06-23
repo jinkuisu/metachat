@@ -248,7 +248,7 @@ index 172759394d7e0..91d91afabe393 100644
        return GetFloatParameter(script_state, pname);
 +    // Fingerprint isolation (FINGERPRINT_ISOLATION_PLAN.md row #18 —
 +    // WebGL limits): return canonical Intel-class values for every
-+    // pname Cloudflare Turnstile / FingerprintJS / amiunique probe.
++    // pname bot-detection services / a fingerprinting library / a fingerprint test site probe.
 +    // Real values are GPU-driver-derived and per-host unique.
      case GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS:
 -      return GetIntParameter(script_state, pname);
@@ -342,14 +342,14 @@ index 172759394d7e0..91d91afabe393 100644
        return ScriptValue::CreateNull(script_state->GetIsolate());
      case WebGLDebugRendererInfo::kUnmaskedRendererWebgl:
        if (ExtensionEnabled(kWebGLDebugRendererInfoName)) {
-+        // EMPIRICAL (2026-05-30 fpjs Pro tests): Win UA + honest
-+        // SwiftShader renderer scores VM ML ~0.97 (fpjs's model treats
++        // EMPIRICAL (2026-05-30 commercial fingerprinters tests): Win UA + honest
++        // SwiftShader renderer scores VM ML ~0.97 (the fingerprinter's model treats
 +        // Win+SwiftShader as "anti-detect browser pretending to be
 +        // Win on Linux"). Win UA + spoofed Intel UHD scores ~0.85
-+        // (better — fpjs treats it as "Win user with integrated GPU"
++        // (better — the fingerprinter treats it as "Win user with integrated GPU"
 +        // even though actual rendering is software). The Intel UHD
 +        // spoof keeps Win persona coherent despite the renderer/perf
-+        // mismatch. For Linux persona, fpjs prefers honest SwiftShader.
++        // mismatch. For Linux persona, the fingerprinter prefers honest SwiftShader.
          return WebGLAny(script_state,
 -                        String(ContextGL()->GetString(GL_RENDERER)));
 +                        String::FromUtf8(fingerprinting::Current().webgl_renderer));
@@ -405,8 +405,8 @@ index 172759394d7e0..91d91afabe393 100644
 +  // shader-precision): return IEEE-754 single-precision constants for
 +  // every (shader, precision_type) tuple. Real values come from the
 +  // host's GL driver and vary slightly across Intel/NVIDIA/AMD even
-+  // though the underlying spec only allows a few values. Cloudflare
-+  // Turnstile calls this 13× per scan to detect the GPU.
++  // though the underlying spec only allows a few values. bot-detection services
++  // the bot detector calls this 13× per scan to detect the GPU.
 +  // INT precisions return precision=0 / range=[31,30] in the canonical
 +  // ANGLE/D3D11 build; FLOAT precisions return precision=23 (mantissa
 +  // bits of single-precision IEEE 754) with range=[127,127] (exponent
@@ -452,7 +452,7 @@ index 172759394d7e0..91d91afabe393 100644
 +  // list differs (extra: EXT_disjoint_timer_query, compressed_texture_*;
 +  // missing: KHR_parallel_shader_compile, WEBGL_blend_func_extended).
 +  // Reporting our underlying list directly leaks the SwiftShader backend
-+  // even though the renderer string claims WARP — CF cross-checks the
++  // even though the renderer string claims WARP — the bot detector cross-checks the
 +  // two and flags the inconsistency.
 +  //
 +  // NOTE: the list below is the WebGL1 capture. The WebGL2 path appends
@@ -483,7 +483,7 @@ index 172759394d7e0..91d91afabe393 100644
 +      // KHR_parallel_shader_compile and WEBGL_blend_func_extended removed
 +      // from the canonical list: SwiftShader (our underlying GL backend)
 +      // doesn't implement them, so listing them in getSupportedExtensions
-+      // while getExtension() returns null was the inconsistency fpjs Pro
++      // while getExtension() returns null was the inconsistency commercial fingerprinters
 +      // surfaces as `unsupported_extensions` — a strong VM/anti-detect ML
 +      // input. Better to under-claim and match SwiftShader honestly.
 +      "OES_element_index_uint",

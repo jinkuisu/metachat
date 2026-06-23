@@ -110,7 +110,7 @@ index 0000000000000..0d349d6dc08aa
 +    // Symbol / dingbat
 +    "Webdings",
 +    "Marlett",
-+    // 2026-05-30: extra Win 11 names matched by fpjs Pro's 52-font
++    // 2026-05-30: extra Win 11 names matched by the commercial fingerprinter's 52-font
 +    // probe that our clone setup specifically targets (the rest of
 +    // the 52-list overlaps the existing entries above).
 +    "Franklin Gothic",
@@ -147,7 +147,7 @@ index 0000000000000..0d349d6dc08aa
 +// "installed" only on macOS hosts). Blocking these at GetFontPlatformData
 +// makes them appear absent without breaking Blink's cascade.
 +//
-+// Sources: amiunique.org's font probe table (~700 fonts), filtered to
++// Sources: a fingerprint test site's font probe table (~700 fonts), filtered to
 +// the subset that's macOS-default-installed but Windows-absent. Apple-
 +// branded font names + CJK script-specific Mac fonts (Hiragino, PingFang,
 +// Heiti, Songti, Kohinoor) dominate the list.
@@ -216,7 +216,7 @@ index 0000000000000..0d349d6dc08aa
 +    // are deliberately NOT in this denylist. Blink's internal font
 +    // cascade on macOS requests them in code paths we haven't fully
 +    // mapped, and blocking them causes a renderer SIGSEGV on
-+    // real-world pages (amiunique.org/fingerprint reproducibly). Even
++    // real-world pages (a fingerprint test site reproducibly). Even
 +    // though the CoreText layer has Carlito/Caladea/etc. activated to
 +    // satisfy CSS lookups for "Calibri"/"Cambria", Blink's internal
 +    // path for the Mac defaults remains. Leaving them allowed means
@@ -305,7 +305,7 @@ index ab909958f63e2..33910187b0cbb 100644
 +#if BUILDFLAG(IS_MAC)
 +  // Lightweight-fork: route Win-typical font-family names to the libre
 +  // equivalents installed via tools/activate_lean_fonts.py. Without this,
-+  // fpjs's font enumeration probe sees these Win-default fonts as missing
++  // the fingerprinter's font enumeration probe sees these Win-default fonts as missing
 +  // (contradicting our Windows persona). Aliasing to Arial / Courier New /
 +  // Times New Roman (which Blink resolves to Arimo / Cousine / Tinos via
 +  // CoreText on this host) makes them register as installed. Widths won't
@@ -313,7 +313,7 @@ index ab909958f63e2..33910187b0cbb 100644
 +  // alternate-lookup path — Windows natively has these so this branch is
 +  // never hit there.
 +  // Expanded list — these are the exact font names a real Win11 Chrome
-+  // returns from fpjs's font probe (verified via real-hardware capture).
++  // returns from the fingerprinter's font probe (verified via real-hardware capture).
 +  // Aliasing them all to one of the three libre families we install via
 +  // tools/activate_lean_fonts.py makes them appear "installed" with
 +  // metric values that differ from the monospace fallback baseline.
@@ -417,7 +417,7 @@ index 75cc0b764f8c4..00ad27fcc43e0 100644
 +  // bypasses this path entirely.
 +  //
 +  // 2026-05-30: STRICT allowlist — only the canonical Win 10/11 base font
-+  // set is visible to page-driven probes. A CreepJS run surfaced our Linux
++  // set is visible to page-driven probes. A a fingerprinting test page run surfaced our Linux
 +  // build's DejaVu / Liberation / Noto-* (incl. rare scripts like Yezidi,
 +  // Gondi, Canadian Aboriginal) as the "38% like headless" tell: real Win 11
 +  // users have NONE of these. The strict allowlist hides them at the
@@ -435,7 +435,7 @@ index 75cc0b764f8c4..00ad27fcc43e0 100644
 +  // would reject every requested family AND every system fallback (Helvetica,
 +  // SF Pro, Menlo) — Chrome's font matcher then returns nullptr to layout,
 +  // NULL-derefs during glyph rendering, and crashes the renderer (SIGSEGV/
-+  // SIGABRT, observed on amiunique.org, CreepJS, browserleaks). Skip the gate
++  // SIGABRT, observed on a fingerprint test site, a fingerprinting test page, a fingerprint test site). Skip the gate
 +  // entirely on Mac so pages render normally.
 +#if !BUILDFLAG(IS_MAC)
 +  if (creation_params.CreationType() == kCreateFontByFamily &&
@@ -481,7 +481,7 @@ index c38cf414f9e09..865c42c6b3a09 100644
 +    // when iterating the CSS font-family stack. This makes JS font probes
 +    // (canvas measureText + document.fonts.check) report Helvetica Neue,
 +    // Menlo, Monaco, Apple Color Emoji etc. as not-installed, contradicting
-+    // the macOS host signal that fpjs Pro's ML uses to flag the browser
++    // the macOS host signal that the commercial fingerprinter's ML uses to flag the browser
 +    // as anti-detect. Last-resort fallback (GetLastResortFallbackFont)
 +    // bypasses this loop by calling FontCache::GetFontData() directly, so
 +    // Blink's internal cascade still finds "Times" and "Lucida Grande"
@@ -505,7 +505,7 @@ index ec06f7decbacf..c962cd6dfa3f9 100644
      ScopedCFTypeRef<CTFontRef> font_to_substitute(
 -        CTFontCreateWithName(CFSTR("Times"), size, nullptr));
 +        // Lightweight-fork: use "Times New Roman" (Win-typical) instead of
-+        // the macOS-typical "Times" so fpjs's emoji.font probe doesn't leak
++        // the macOS-typical "Times" so the fingerprinter's emoji.font probe doesn't leak
 +        // that we're on macOS. CoreText will resolve to the system Times
 +        // family either way; only the reported family name differs.
 +        CTFontCreateWithName(CFSTR("Times New Roman"), size, nullptr));

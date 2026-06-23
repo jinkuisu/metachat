@@ -11,7 +11,7 @@ index a8b7d042e37e1..73f948e0aff6c 100644
 +  // Restored to Chrome defaults (100us coarse, 5us fine). The earlier
 +  // 100ms / 1ms clamp (matching Tor Browser RFP) was a strong anti-detect
 +  // tell — real Chrome 148 exposes 100us resolution on `performance.now()`
-+  // and CF Turnstile (plus fpjs Pro) include a simple
++  // and bot-detection services (plus commercial fingerprinters) include a simple
 +  // `performance.now() % 1` distribution check that flags 100ms-clamped
 +  // values as bot. Reverting closes the tell without revealing host OS
 +  // (timing resolution is identical across Mac/Win/Linux Chrome).
@@ -32,7 +32,7 @@ index 7e7e800ffca8a..670e1577fe1b6 100644
 +
 +// Persona-mode: pre-process the input URL string the way upstream Chromium's
 +// WIN32-only url_util.cc does, so `new URL("C:/")` resolves to scheme=file:
-+// on Mac/Linux too. FingerprintJS Pro signal s205 reads
++// on Mac/Linux too. commercial fingerprinters signal s205 reads
 +//   new URL("C:/").protocol
 +// to detect the host OS: Windows returns "file:", everyone else "c:". The
 +// fork claims Windows; this rewrite makes the protocol match the persona

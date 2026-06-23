@@ -78,7 +78,35 @@ index ed69c678e9a8d..d206338d33205 100644
    }
  }
  
++// MetaChat: configurable command blocklist for --metachat-mode.
++// Reads --metachat-mode-allowlist and --metachat-mode-blocklist.
++// Only active when --metachat-mode is set.
 +bool IsLightweightForkBlockedCommand(int id) {
++  const auto* cmdline = base::CommandLine::ForCurrentProcess();
++  if (!cmdline->HasSwitch(switches::kMetachatMode)) {
++    return false;
++  }
++
++  // Allowlist check: if id is explicitly allowed, return false.
++  static std::set<int> s_allowlist = []() {
++    std::set<int> ids;
++    std::string list = base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
++        switches::kMetachatModeAllowList);
++    if (list.empty()) return ids;
++    for (const auto& name : base::SplitString(
++             list, ",", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY)) {
++      int cmd_id = 0;
++      if (base::StringToInt(name, &cmd_id)) {
++        ids.insert(cmd_id);
++      }
++    }
++    return ids;
++  }();
++  if (s_allowlist.find(id) != s_allowlist.end()) {
++    return false;
++  }
++
++  // Default blocklist
 +  switch (id) {
 +    // Host/file integration.
 +    case IDC_OPEN_FILE:
@@ -127,10 +155,6 @@ index ed69c678e9a8d..d206338d33205 100644
 +    case IDC_SHOW_SIGNIN:
 +    case IDC_SHOW_SIGNIN_WHEN_PAUSED:
 +    // Extensions and Chrome Web Store UI.
-+    case IDC_MANAGE_EXTENSIONS:
-+    case IDC_SAFETY_HUB_MANAGE_EXTENSIONS:
-+    case IDC_EXTENSIONS_SUBMENU_MANAGE_EXTENSIONS:
-+    case IDC_EXTENSIONS_SUBMENU_VISIT_CHROME_WEB_STORE:
 +    // Password manager, payments, autofill, safety hub, sharing, side panels.
 +    case IDC_PASSWORDS_AND_AUTOFILL_MENU:
 +    case IDC_SHOW_PASSWORD_MANAGER:
@@ -153,7 +177,6 @@ index ed69c678e9a8d..d206338d33205 100644
 +    case IDC_SHOW_CUSTOMIZE_CHROME_TOOLBAR:
 +    case IDC_CUSTOMIZE_CHROME:
 +    case IDC_SHOW_CHROME_LABS:
-+    case IDC_SHOW_MANAGEMENT_PAGE:
 +    // Translation surfaces (UI + context menu offers).
 +    case IDC_SHOW_TRANSLATE:
 +    case IDC_CONTENT_CONTEXT_TRANSLATE:
@@ -177,8 +200,25 @@ index ed69c678e9a8d..d206338d33205 100644
 +    case IDC_VIEW_PASSWORDS:
 +      return true;
 +    default:
-+      return false;
++      break;
 +  }
++
++  // Custom blocklist from --metachat-mode-blocklist.
++  static std::set<int> s_blocklist = []() {
++    std::set<int> ids;
++    std::string list = base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
++        switches::kMetachatModeBlockList);
++    if (list.empty()) return ids;
++    for (const auto& name : base::SplitString(
++             list, ",", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY)) {
++      int cmd_id = 0;
++      if (base::StringToInt(name, &cmd_id)) {
++        ids.insert(cmd_id);
++      }
++    }
++    return ids;
++  }();
++  return s_blocklist.find(id) != s_blocklist.end();
 +}
 +
  bool CanOpenFile(Browser* browser) {

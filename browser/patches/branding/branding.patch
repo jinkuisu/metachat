@@ -6,8 +6,8 @@ index 6fada0a2b1a1f..39c9a98bdadd1 100644
  	<key>CFBundleDevelopmentRegion</key>
  	<string>en</string>
  	<key>CFBundleDisplayName</key>
--	<string>${EXECUTABLE_NAME}</string>
-+	<string>${CHROMIUM_SHORT_NAME}</string>
+-	<string></string>
++	<string>MetaChat</string>
  	<key>CFBundleDocumentTypes</key>
  	<array>
  		<dict>
@@ -20,11 +20,11 @@ index cb212bf396c79..edd4bbe48816f 100644
          <else>
            <message name="IDS_PRODUCT_NAME" desc="The Chrome application name" translateable="false">
 -            Chromium
-+            ChromiumFish
++            MetaChat
            </message>
            <message name="IDS_SHORT_PRODUCT_NAME" desc="The Chrome application short name." translateable="false">
 -            Chromium
-+            ChromiumFish
++            MetaChat
            </message>
          </else>
        </if>
@@ -39,10 +39,10 @@ index f8363d5b294fe..22622d6a37f74 100644
 -PRODUCT_SHORTNAME=Chromium
 -PRODUCT_INSTALLER_FULLNAME=Chromium Installer
 -PRODUCT_INSTALLER_SHORTNAME=Chromium Installer
-+PRODUCT_FULLNAME=ChromiumFish
-+PRODUCT_SHORTNAME=ChromiumFish
-+PRODUCT_INSTALLER_FULLNAME=ChromiumFish Installer
-+PRODUCT_INSTALLER_SHORTNAME=ChromiumFish Installer
++PRODUCT_FULLNAME=MetaChat Browser
++PRODUCT_SHORTNAME=MetaChat
++PRODUCT_INSTALLER_FULLNAME=MetaChat Browser Installer
++PRODUCT_INSTALLER_SHORTNAME=MetaChat Browser Installer
  COPYRIGHT=Copyright @LASTCHANGE_YEAR@ The Chromium Authors. All rights reserved.
  MAC_BUNDLE_ID=org.chromium.Chromium
  MAC_CREATOR_CODE=Cr24
