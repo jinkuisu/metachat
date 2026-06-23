@@ -45,7 +45,7 @@ jobs:
       - name: Apply ChromiumFish patches
         shell: pwsh
         run: |
-          $repo = "$env:GITHUB_WORKSPACE\metachat\browser"
+          $repo = "$env:GITHUB_WORKSPACE\browser"
           cd $env:SRC_DIR
           Get-Content "$repo\patches\series" | ForEach-Object {
             $patch = $_.Trim()
@@ -63,12 +63,12 @@ jobs:
 
       - name: Overlay assets
         shell: pwsh
-        run: robocopy "$env:GITHUB_WORKSPACE\metachat\browser\assets" "$env:SRC_DIR" /MIR /NJH /NJS /NP
+        run: robocopy "$env:GITHUB_WORKSPACE\browser\assets" "$env:SRC_DIR" /MIR /NJH /NJS /NP
 
       - name: Apply MetaChat patches
         shell: pwsh
         run: |
-          $patchDir = "$env:GITHUB_WORKSPACE\metachat\browser\metachat-patches"
+          $patchDir = "$env:GITHUB_WORKSPACE\browser\metachat-patches"
           if (Test-Path $patchDir) {
             Get-ChildItem "$patchDir\*.patch" | Sort-Object Name | ForEach-Object {
               Write-Host "MetaChat: $($_.Name)"
