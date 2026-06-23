@@ -20,16 +20,18 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          path: metachat
 
       - name: Setup depot_tools
         shell: pwsh
-        run: git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git C:\depot_tools; echo "C:\depot_tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        run: |
+          git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git C:\depot_tools
+          echo "C:\depot_tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Setup VS2022
         shell: pwsh
-        run: choco install visualstudio2022buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended" -y; choco install windows-sdk-10.0 -y
+        run: |
+          choco install visualstudio2022buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended" -y
+          choco install windows-sdk-10.0 -y
 
       - name: Fetch Chromium source
         shell: pwsh
@@ -78,11 +80,11 @@ jobs:
             if ($rejFiles) { Write-Host "REJECTED" -ForegroundColor Red; $rejFiles; exit 1 }
           } else { Write-Host "No MetaChat patches" -ForegroundColor Yellow }
 
-      - name: Build overrides
+      - name: Create build overrides
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path $env:SRC_DIR\build_overrides
-          Set-Content $env:SRC_DIR\build_overrides\pdfium.gni "declare_args() { pdf_bundle_freetype_override = false; pdf_enable_brotli_override = false; pdf_enable_v8_override = false; pdf_enable_xfa_override = false; pdf_use_partition_alloc_override = false; pdf_use_skia_override = false; pdf_skia_font_manager_target_override = 'pdfium'; pdf_enable_fontations_override = false; pdf_enable_rust_png_override = false }"
+          Set-Content -Path $env:SRC_DIR\build_overrides\pdfium.gni -Value "declare_args() { pdf_bundle_freetype_override = false }"
 
       - name: Download toolchains
         shell: pwsh
@@ -96,7 +98,7 @@ jobs:
         run: |
           cd $env:SRC_DIR
           New-Item -ItemType Directory -Force -Path out\Release_GN_x64
-          Set-Content out\Release_GN_x64\args.gn (@"
+          $gnArgs = @"
 is_debug = false
 is_component_build = false
 symbol_level = 0
@@ -119,7 +121,8 @@ chrome_pgo_phase = 0
 enable_extensions_core = true
 dawn_enable_vulkan_validation_layers = false
 angle_enable_vulkan_validation_layers = false
-"@)
+"@
+          Set-Content -Path out\Release_GN_x64\args.gn -Value $gnArgs
           gn gen out\Release_GN_x64 2>&1
 
       - name: Build
