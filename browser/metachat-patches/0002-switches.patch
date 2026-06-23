@@ -24,24 +24,16 @@ index 0000000000000..1111111111111
  extern const char kAcceptLangSetClear[];
  extern const char kAcceptLangSetClearMostVisitedURL[];
 
-diff --git a/chrome/common/chrome_switches.cc b/chrome/common/chrome_switches.cc
-index 0000000000000..2222222222222
---- a/chrome/common/chrome_switches.cc
-+++ b/chrome/common/chrome_switches.cc
-@@ -84,6 +84,15 @@
- // any purpose.
- const char kMachineLevelUserDataDir[]    = "machine-level-user-data-dir";
-
-+// MetaChat: when present, the browser runs as MetaChat Browser with custom
-+// WebUI shell instead of the native Chrome UI.
-+const char kMetachatMode[]               = "metachat-mode";
-+// MetaChat: comma-separated IDC command names to block (e.g. "IDC_PRINT").
-+// Only checked when --metachat-mode is active.
-+const char kMetachatModeBlockList[]      = "metachat-mode-blocklist";
-+// MetaChat: comma-separated IDC command names to unblock from default list.
-+// Takes precedence over both default and --metachat-mode-blocklist.
-+const char kMetachatModeAllowList[]      = "metachat-mode-allowlist";
-+
- // There are several parameters that we work around to remove the
- // "expose" C++ concept from the DevTools protocol.
- const char kRemoteDebuggingPort[]        = "remote-debugging-port";
+diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
+--- a/chrome/browser/ui/browser_command_controller.cc
++++ b/chrome/browser/ui/browser_command_controller.cc
+@@ -38,6 +38,10 @@
+ #include "base/functional/bind.h"
+ #include "base/location.h"
+ #include "base/metrics/user_metrics.h"
++#include "base/strings/string_number_conversions.h"
++#include "base/strings/string_split.h"
++#include "chrome/common/chrome_switches.h"
+ #include "base/time/time.h"
+ #include "build/branding_buildflags.h"
+ #include "build/build_config.h"
