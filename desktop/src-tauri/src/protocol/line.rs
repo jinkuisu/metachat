@@ -1,0 +1,1 @@
+﻿// LINE: XHR response interception

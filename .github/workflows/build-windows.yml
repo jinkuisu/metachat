@@ -1,0 +1,145 @@
+name: Build MetaChat Browser (Windows)
+
+on:
+  workflow_dispatch:
+    inputs:
+      chromium_tag:
+        description: "Chromium tag to build"
+        required: true
+        default: "150.0.7844.0"
+
+env:
+  CHROMIUM_TAG: ${{ github.event.inputs.chromium_tag || '150.0.7844.0' }}
+  CHROMIUM_DIR: C:\chromium
+  SRC_DIR: C:\chromium\src
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 480
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: metachat
+
+      - name: Setup depot_tools
+        shell: pwsh
+        run: git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git C:\depot_tools; echo "C:\depot_tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Setup VS2022
+        shell: pwsh
+        run: choco install visualstudio2022buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended" -y; choco install windows-sdk-10.0 -y
+
+      - name: Fetch Chromium source
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:CHROMIUM_DIR
+          cd $env:CHROMIUM_DIR
+          fetch --nohooks --no-history chromium
+          cd src
+          git fetch origin refs/tags/$env:CHROMIUM_TAG:refs/tags/$env:CHROMIUM_TAG --depth=1
+          git checkout $env:CHROMIUM_TAG
+          gclient sync --with_branch_heads --with_tags --nohooks -D
+
+      - name: Apply ChromiumFish patches
+        shell: pwsh
+        run: |
+          $repo = "$env:GITHUB_WORKSPACE\metachat\browser"
+          cd $env:SRC_DIR
+          Get-Content "$repo\patches\series" | ForEach-Object {
+            $patch = $_.Trim()
+            if ($patch -and $patch -notmatch "^#") {
+              $patchFile = "$repo\patches\$patch"
+              if (Test-Path $patchFile) {
+                Write-Host "Applying: $patch"
+                git apply --reject --whitespace=fix $patchFile 2>&1
+              }
+            }
+          }
+          $rejFiles = Get-ChildItem -Recurse -Filter "*.rej" -Name
+          if ($rejFiles) { Write-Host "REJECTED" -ForegroundColor Red; $rejFiles; exit 1 }
+          Write-Host "All patches applied" -ForegroundColor Green
+
+      - name: Overlay assets
+        shell: pwsh
+        run: robocopy "$env:GITHUB_WORKSPACE\metachat\browser\assets" "$env:SRC_DIR" /MIR /NJH /NJS /NP
+
+      - name: Apply MetaChat patches
+        shell: pwsh
+        run: |
+          $patchDir = "$env:GITHUB_WORKSPACE\metachat\browser\metachat-patches"
+          if (Test-Path $patchDir) {
+            Get-ChildItem "$patchDir\*.patch" | Sort-Object Name | ForEach-Object {
+              Write-Host "MetaChat: $($_.Name)"
+              cd $env:SRC_DIR; git apply --reject --whitespace=fix $_.FullName 2>&1
+            }
+            $rejFiles = Get-ChildItem -Recurse -Filter "*.rej" -Name
+            if ($rejFiles) { Write-Host "REJECTED" -ForegroundColor Red; $rejFiles; exit 1 }
+          } else { Write-Host "No MetaChat patches" -ForegroundColor Yellow }
+
+      - name: Build overrides
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:SRC_DIR\build_overrides
+          Set-Content $env:SRC_DIR\build_overrides\pdfium.gni "declare_args() { pdf_bundle_freetype_override = false; pdf_enable_brotli_override = false; pdf_enable_v8_override = false; pdf_enable_xfa_override = false; pdf_use_partition_alloc_override = false; pdf_use_skia_override = false; pdf_skia_font_manager_target_override = 'pdfium'; pdf_enable_fontations_override = false; pdf_enable_rust_png_override = false }"
+
+      - name: Download toolchains
+        shell: pwsh
+        run: |
+          cd $env:SRC_DIR
+          python3 tools\clang\scripts\update.py 2>&1
+          python3 tools\rust\update_rust.py 2>&1
+
+      - name: Configure GN
+        shell: pwsh
+        run: |
+          cd $env:SRC_DIR
+          New-Item -ItemType Directory -Force -Path out\Release_GN_x64
+          Set-Content out\Release_GN_x64\args.gn (@"
+is_debug = false
+is_component_build = false
+symbol_level = 0
+blink_symbol_level = 0
+v8_symbol_level = 0
+enable_nacl = false
+enable_remoting = false
+enable_extensions = true
+enable_plugins = true
+enable_widevine = false
+enable_swiftshader = false
+enable_pdf = true
+enable_pdfium = true
+enable_printing = true
+enable_print_preview = true
+treat_warnings_as_errors = false
+google_api_key = ""
+use_unofficial_version_number = false
+chrome_pgo_phase = 0
+enable_extensions_core = true
+dawn_enable_vulkan_validation_layers = false
+angle_enable_vulkan_validation_layers = false
+"@)
+          gn gen out\Release_GN_x64 2>&1
+
+      - name: Build
+        shell: pwsh
+        run: cd $env:SRC_DIR; autoninja -C out\Release_GN_x64 chrome
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $outDir = "$env:SRC_DIR\out\Release_GN_x64"
+          $dest = "${{ runner.temp }}\metachat-pkg"
+          New-Item -ItemType Directory -Force -Path $dest
+          Copy-Item "$outDir\chrome.exe" "$dest\MetaChat.exe"
+          Copy-Item "$outDir\*.dll" $dest
+          Copy-Item "$outDir\*.pak" $dest
+          Copy-Item "$outDir\*.bin" $dest -ErrorAction SilentlyContinue
+          Copy-Item -Recurse "$outDir\locales" $dest -ErrorAction SilentlyContinue
+          Compress-Archive -Path "$dest\*" -DestinationPath "${{ github.workspace }}\metachat-browser-windows.zip" -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: metachat-browser-windows
+          path: metachat-browser-windows.zip

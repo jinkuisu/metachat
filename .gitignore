@@ -1,0 +1,40 @@
+﻿# --- MetaChat Browser (Chromium checkout) ---
+browser/src/
+browser/out/
+browser/dist/
+browser/build/
+
+# --- Rust / Cargo ---
+.cargo-out/
+.cargo-out2/
+**/target/
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+
+# --- Node ---
+**/node_modules/
+.cache/
+
+# --- Python ---
+__pycache__/
+*.pyc
+.env
+venv/
+
+# --- Build artifacts ---
+*.exe
+*.dll
+*.pak
+*.zip
+*.tar.gz

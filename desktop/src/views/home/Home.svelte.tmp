@@ -1,0 +1,33 @@
+﻿<script lang="ts">
+  import { ui } from "$lib/stores/uiStore";
+
+  function setConfig(view: string | null) {
+    ui.setConfigView(ui.configView === view ? null : view);
+  }
+</script>
+
+{#if ui.configView === "settings"}
+  <div class="fixed inset-0 flex items-center justify-center z-10" style="pointer-events: none;">
+    <div style="pointer-events: auto;">
+      <SettingView />
+    </div>
+  </div>
+{:else if ui.configView === "reply"}
+  <div class="fixed inset-0 flex items-center justify-center z-10" style="pointer-events: none;">
+    <div style="pointer-events: auto;">
+      <ReplyView />
+    </div>
+  </div>
+{:else if ui.configView === "prompts"}
+  <div class="fixed inset-0 flex items-center justify-center z-10" style="pointer-events: none;">
+    <div style="pointer-events: auto;">
+      <PromptsView />
+    </div>
+  </div>
+{:else}
+  <div class="fixed inset-0 flex flex-col items-center justify-center z-10">
+    <GreetingCard />
+  </div>
+  <AccountCards />
+  <PlatformPills />
+{/if}

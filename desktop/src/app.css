@@ -1,0 +1,107 @@
+﻿@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════
+   Theme Tokens (CSS Custom Properties)
+   ═══════════════════════════════════════════ */
+
+:root,
+[data-theme="light"] {
+  --canvas-start: #fdfbf7;
+  --canvas-mid: #f5f2ec;
+  --canvas-end: #ede9e2;
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-heavy: rgba(255, 255, 255, 0.92);
+  --glass-light: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(0, 0, 0, 0.06);
+  --glass-border-light: rgba(255, 255, 255, 0.4);
+  --primary: #0d9488;
+  --primary-light: #14b8a6;
+  --primary-dark: #0f766e;
+  --text-primary: #1c1917;
+  --text-muted: #78716c;
+  --text-muted-light: #a8a29e;
+  --shadow-glass: 0 4px 12px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.06);
+  --shadow-glass-sm: 0 2px 8px rgba(0,0,0,0.04);
+  --shadow-glass-lg: 0 8px 24px rgba(0,0,0,0.08), 0 24px 48px rgba(0,0,0,0.06);
+  --radius-pill: 24px;
+  --radius-card: 16px;
+  --radius-panel: 20px;
+  --radius-glass: 12px;
+}
+
+[data-theme="dark"] {
+  --canvas-start: #0c0a09;
+  --canvas-mid: #1c1917;
+  --canvas-end: #292524;
+  --glass-bg: rgba(28,25,23,0.85);
+  --glass-heavy: rgba(28,25,23,0.92);
+  --glass-light: rgba(28,25,23,0.7);
+  --glass-border: rgba(255,255,255,0.06);
+  --glass-border-light: rgba(255,255,255,0.1);
+  --primary: #14b8a6;
+  --primary-light: #2dd4bf;
+  --primary-dark: #0d9488;
+  --text-primary: #fafaf9;
+  --text-muted: #a8a29e;
+  --text-muted-light: #78716c;
+  --shadow-glass: 0 4px 12px rgba(0,0,0,0.2), 0 12px 40px rgba(0,0,0,0.3);
+  --shadow-glass-sm: 0 2px 8px rgba(0,0,0,0.15);
+  --shadow-glass-lg: 0 8px 24px rgba(0,0,0,0.25), 0 24px 48px rgba(0,0,0,0.2);
+}
+
+.canvas-bg {
+  background: linear-gradient(165deg, var(--canvas-start) 0%, var(--canvas-mid) 50%, var(--canvas-end) 100%);
+  background-size: 200% 200%;
+  animation: ambient-shift 30s ease infinite;
+}
+
+@keyframes ambient-shift {
+  0%, 100% { background-position: 0% 0%; }
+  50% { background-position: 100% 50%; }
+}
+
+.glass { background: var(--glass-bg); backdrop-filter: blur(20px); border: 1px solid var(--glass-border-light); box-shadow: var(--shadow-glass); }
+.glass-heavy { background: var(--glass-heavy); backdrop-filter: blur(24px); border: 1px solid var(--glass-border); }
+.glass-light { background: var(--glass-light); backdrop-filter: blur(16px); border: 1px solid var(--glass-border-light); }
+
+.text-theme-primary { color: var(--text-primary); }
+.text-theme-muted { color: var(--text-muted); }
+.text-theme-muted-light { color: var(--text-muted-light); }
+.bg-theme-glass { background: var(--glass-bg); }
+.border-theme-glass { border-color: var(--glass-border); }
+.shadow-theme-glass { box-shadow: var(--shadow-glass); }
+.shadow-theme-glass-sm { box-shadow: var(--shadow-glass-sm); }
+.shadow-theme-glass-lg { box-shadow: var(--shadow-glass-lg); }
+.radius-pill { border-radius: var(--radius-pill); }
+.radius-card { border-radius: var(--radius-card); }
+.radius-panel { border-radius: var(--radius-panel); }
+.radius-glass { border-radius: var(--radius-glass); }
+
+:root {
+  font-family: "Plus Jakarta Sans", Inter, system-ui, sans-serif;
+  font-size: 14px; line-height: 1.5;
+  color: var(--text-primary);
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.08); border-radius: 4px; }
+
+html, body, #app { width: 100%; height: 100%; min-height: 0; margin: 0; padding: 0; overflow: hidden; }
+
+/* Animation Utilities */
+.animate-fade-in { animation: fade-in 0.3s ease; }
+.animate-slide-in { animation: slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-zoom-in { animation: zoom-in 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-zoom-out { animation: zoom-out 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slide-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes zoom-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+@keyframes zoom-out { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.95); } }
