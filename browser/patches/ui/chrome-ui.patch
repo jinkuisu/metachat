@@ -666,7 +666,7 @@ index dd37ab85cec11..4ff23f0e8ab8c 100644
  const GURL& ChromeUINewTabURLAsGURL() {
 -  static base::NoDestructor<GURL> instance(kChromeUINewTabURL);
 +  // Lightweight-fork: blank NTP instead of the Google-branded chrome://newtab.
-+  static base::NoDestructor<GURL> instance("about:blank");
++  static base::NoDestructor<GURL> instance("chrome://metachat/");
    return *instance;
  }
  
