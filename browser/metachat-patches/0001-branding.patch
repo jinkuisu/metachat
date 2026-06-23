@@ -1,4 +1,21 @@
-﻿diff --git a/chrome/app/chromium_strings.grd b/chrome/app/chromium_strings.grd
+// MetaChat: override bundle display name from ${CHROMIUM_SHORT_NAME}
+diff --git a/chrome/app/app-Info.plist b/chrome/app/app-Info.plist
+index 39c9a98bdadd1..f6b1e8d2c5a3b 100644
+--- a/chrome/app/app-Info.plist
++++ b/chrome/app/app-Info.plist
+@@ -5,7 +5,7 @@
+ 	<key>CFBundleDevelopmentRegion</key>
+ 	<string>en</string>
+ 	<key>CFBundleDisplayName</key>
+-	<string>${CHROMIUM_SHORT_NAME}</string>
++	<string>MetaChat</string>
+ 	<key>CFBundleDocumentTypes</key>
+ 	<array>
+ 		<dict>
+
+// MetaChat: replace ChromiumFish product name strings with MetaChat
+// IDS_PRODUCT_NAME and IDS_SHORT_PRODUCT_NAME control all UI labels.
+diff --git a/chrome/app/chromium_strings.grd b/chrome/app/chromium_strings.grd
 index edd4bbe48816f..e54dcd20d9107 100644
 --- a/chrome/app/chromium_strings.grd
 +++ b/chrome/app/chromium_strings.grd
@@ -15,6 +32,8 @@ index edd4bbe48816f..e54dcd20d9107 100644
            </message>
          </else>
        </if>
+
+// MetaChat: update BRANDING config for installer, about page, and bundle metadata
 diff --git a/chrome/app/theme/chromium/BRANDING b/chrome/app/theme/chromium/BRANDING
 index 22622d6a37f74..a5ea706a39e8f 100644
 --- a/chrome/app/theme/chromium/BRANDING
