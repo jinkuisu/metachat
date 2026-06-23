@@ -1,37 +1,64 @@
 // MetaChat: hide native Chrome UI when --metachat-mode is active.
-// Blocks commands unrelated to the messaging-browser experience while
-// preserving essential operations: page reload (F5), developer tools
-// (F12), extensions management, find in page (Ctrl+F), and new tab.
-// Uses IsMetachatModeBlockedCommand() as a centralized gate.
+// Uses a configurable command blocklist with allowlist override.
+// Default blocklist covers bookmarks/history/downloads/settings etc.
+// Allowlist preserves essential operations: reload, devtools, extensions.
+// Configure via --metachat-mode-blocklist and --metachat-mode-allowlist.
+// Both accept comma-separated IDC command names (e.g. "IDC_PRINT,IDC_SAVE_PAGE").
 
 diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
 --- a/chrome/browser/ui/browser_command_controller.cc
 +++ b/chrome/browser/ui/browser_command_controller.cc
-@@ -26,6 +26,7 @@
- #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
- #include "chrome/browser/ui/commander/commander.h"
- #include "chrome/browser/ui/global_error/global_error_service_factory.h"
-+#include "chrome/common/chrome_switches.h"
- #include "chrome/common/pref_names.h"
- #include "components/prefs/pref_service.h"
- #include "content/public/browser/navigation_controller.h"
-@@ -219,6 +220,107 @@ void AppInfoDialogClosedCallback(SessionID session_id,
+@@ -68,6 +68,8 @@
+ #include "base/functional/bind.h"
+ #include "base/location.h"
+ #include "base/metrics/user_metrics.h"
++#include "base/strings/string_number_conversions.h"
++#include "base/strings/string_split.h"
+ #include "base/time/time.h"
+ #include "build/branding_buildflags.h"
+ #include "build/build_config.h"
+@@ -219,6 +221,127 @@ void AppInfoDialogClosedCallback(SessionID session_id,
    }
  }
 
-+// MetaChat: centralized command gate for --metachat-mode. Blocks native
-+// Chrome UI commands irrelevant to the messaging-browser experience.
-+// Preserved: Reload (F5), DevTools (F12), Extensions management, Find,
-+// New Tab, Zoom, Cut/Copy/Paste — all work as keyboard shortcuts.
-+// Checked in SupportsCommand, IsCommandEnabled, ExecuteCommand, and
-+// ExecuteCommandWithDisposition.
-+bool IsMetachatModeBlockedCommand(int id) {
-+  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
-+          switches::kMetachatMode)) {
++// MetaChat: configurable command blocklist for --metachat-mode.
++// Returns true if |id| should be blocked.
++// Gating logic:
++//   1. Allowlist check: if id is explicitly allowed, return false.
++//   2. Blocklist check: if id is in default OR custom blocklist, return true.
++//   3. Otherwise: return false (command runs normally).
++// Allowlist takes precedence over both default and custom blocklists.
++static bool IsMetachatModeBlockedCommand(int id) {
++  const auto* cmdline = base::CommandLine::ForCurrentProcess();
++  if (!cmdline->HasSwitch(switches::kMetachatMode)) {
 +    return false;
 +  }
++
++  // Build allowlist set from --metachat-mode-allowlist.
++  // Users can unblock any default-blocked command, e.g.:
++  //   --metachat-mode-allowlist=IDC_PRINT,IDC_BOOKMARK_THIS_TAB
++  static std::set<int> s_allowlist = []() {
++    std::set<int> ids;
++    std::string list = base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
++        switches::kMetachatModeAllowList);
++    if (list.empty()) return ids;
++    for (const auto& name : base::SplitString(
++             list, ",", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY)) {
++      int cmd_id = 0;
++      // If it's a numeric ID, parse directly.
++      if (base::StringToInt(name, &cmd_id)) {
++        ids.insert(cmd_id);
++      }
++    }
++    return ids;
++  }();
++  if (s_allowlist.find(id) != s_allowlist.end()) {
++    return false;
++  }
++
++  // Default blocklist: commands irrelevant to the messaging-browser experience.
 +  switch (id) {
-+    // File/host integration — no file dialog or print in --metachat-mode.
++    // File/host integration.
 +    case IDC_OPEN_FILE:
 +    case IDC_SAVE_PAGE:
 +    case IDC_PRINT:
@@ -99,14 +126,33 @@ diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui
 +    case IDC_CHROME_TIPS:
 +      return true;
 +    default:
-+      return false;
++      break;
 +  }
++
++  // Check custom blocklist from --metachat-mode-blocklist.
++  // Users can add extra blocked commands, e.g.:
++  //   --metachat-mode-blocklist=IDC_FIND,IDC_ZOOM_PLUS
++  static std::set<int> s_blocklist = []() {
++    std::set<int> ids;
++    std::string list = base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
++        switches::kMetachatModeBlockList);
++    if (list.empty()) return ids;
++    for (const auto& name : base::SplitString(
++             list, ",", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY)) {
++      int cmd_id = 0;
++      if (base::StringToInt(name, &cmd_id)) {
++        ids.insert(cmd_id);
++      }
++    }
++    return ids;
++  }();
++  return s_blocklist.find(id) != s_blocklist.end();
 +}
 +
  bool CanOpenFile(Browser* browser) {
    if (browser->is_type_devtools() || browser->is_type_app() ||
        browser->is_type_app_popup()) {
-@@ -580,15 +682,24 @@ void BrowserCommandController::ShowCustomizeChromeSidePanel(
+@@ -580,15 +703,24 @@ void BrowserCommandController::ShowCustomizeChromeSidePanel(
  // BrowserCommandController, CommandUpdater implementation:
 
  bool BrowserCommandController::SupportsCommand(int id) const {
@@ -132,7 +178,7 @@ diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui
                                         time_stamp);
  }
 
-@@ -597,6 +708,9 @@ bool BrowserCommandController::ExecuteCommandWithDisposition(
+@@ -597,6 +729,9 @@ bool BrowserCommandController::ExecuteCommandWithDisposition(
      int id,
      WindowOpenDisposition disposition,
      base::TimeTicks time_stamp) {
@@ -160,8 +206,6 @@ diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/v
        if (browser_->is_type_app_popup()) {
 +        // MetaChat: in --metachat-mode, use frameless window style so
 +        // the browser window has no title bar or frame decorations.
-+        // Combined with hiding tab strip and toolbar below, this gives a
-+        // clean content-only window for the MetaChat WebUI overlay.
 +        if (base::CommandLine::ForCurrentProcess()->HasSwitch(
 +                switches::kMetachatMode)) {
 +          set_frame_type(WidgetFrameType::kFullscreen);
@@ -173,7 +217,7 @@ diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/v
          set_frame_type(WidgetFrameType::kFullscreen);
          set_force_google_ui(false);
        }
-@@ -5090,6 +5103,19 @@ bool BrowserView::ShouldShowTabStrip() const {
+@@ -5090,6 +5103,13 @@ bool BrowserView::ShouldShowTabStrip() const {
  // MetaChat: local helper to check metachat-mode.
  bool IsMetachatModeEnabled() {
    return base::CommandLine::ForCurrentProcess()->HasSwitch(
@@ -181,8 +225,7 @@ diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/v
 +}
 +
 +bool BrowserView::ShouldShowTabStrip() const {
-+  // MetaChat: hide tab strip in --metachat-mode. Tabs are managed by the
-+  // WebContents Manager (0005) and switched via the MetaChat WebUI.
++  // MetaChat: hide tab strip in --metachat-mode. Tabs managed via WebUI.
 +  if (IsMetachatModeEnabled()) {
 +    return false;
 +  }
@@ -191,7 +234,7 @@ diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/v
        Browser::WindowFeature::kFeatureTabstrip);
  }
 
-@@ -5109,6 +5135,11 @@ bool BrowserView::ShouldShowBookmarkBar(
+@@ -5109,6 +5129,11 @@ bool BrowserView::ShouldShowBookmarkBar(
      std::optional<ShowBookmarkBarWhileAnimating> show_bookmark_bar_while_animating)
      const {
 +  // MetaChat: hide bookmarks bar in --metachat-mode.
@@ -204,8 +247,8 @@ diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/v
            bookmarks::prefs::kShowBookmarkBar);
  }
 
-@@ -5804,6 +5835,11 @@ bool BrowserView::IsLocationBarVisible() const {
-   // WebUI overlay, do not let native location bar compete for screen space.
+@@ -5804,6 +5829,11 @@ bool BrowserView::IsLocationBarVisible() const {
+   // MetaChat: hide location bar in --metachat-mode (WebUI handles nav).
 +  if (IsMetachatModeEnabled()) {
 +    return false;
 +  }
@@ -214,7 +257,7 @@ diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/v
      return false;
    }
 
-@@ -5959,6 +5995,11 @@ bool BrowserView::IsToolbarVisible() const {
+@@ -5959,6 +5989,11 @@ bool BrowserView::IsToolbarVisible() const {
    // MetaChat: hide toolbar in --metachat-mode.
 +  if (IsMetachatModeEnabled()) {
 +    return false;

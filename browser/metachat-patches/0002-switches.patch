@@ -7,13 +7,19 @@ diff --git a/chrome/common/chrome_switches.h b/chrome/common/chrome_switches.h
 index 0000000000000..1111111111111
 --- a/chrome/common/chrome_switches.h
 +++ b/chrome/common/chrome_switches.h
-@@ -30,6 +30,9 @@
+@@ -30,6 +30,15 @@
  // //chrome/browser/  code.
  // TODO(crbug.com/40258183): Remove these after the ChromeRootWindowController
  // migration.
 +// MetaChat: --metachat-mode activates the MetaChat Browser environment.
 +// When set, the browser hides native Chrome UI and loads the MetaChat WebUI.
 +extern const char kMetachatMode[];
++// MetaChat: comma-separated list of IDC command IDs to additionally block
++// when --metachat-mode is active. Overrides the default blocklist.
++extern const char kMetachatModeBlockList[];
++// MetaChat: comma-separated list of IDC command IDs to allow even when
++// they are on the default blocklist. Takes precedence over blocklist.
++extern const char kMetachatModeAllowList[];
  // TODO(crbug.com/402502018): remove this.
  extern const char kAcceptLangSetClear[];
  extern const char kAcceptLangSetClearMostVisitedURL[];
@@ -22,13 +28,19 @@ diff --git a/chrome/common/chrome_switches.cc b/chrome/common/chrome_switches.cc
 index 0000000000000..2222222222222
 --- a/chrome/common/chrome_switches.cc
 +++ b/chrome/common/chrome_switches.cc
-@@ -84,6 +84,9 @@
+@@ -84,6 +84,15 @@
  // any purpose.
  const char kMachineLevelUserDataDir[]    = "machine-level-user-data-dir";
 
 +// MetaChat: when present, the browser runs as MetaChat Browser with custom
 +// WebUI shell instead of the native Chrome UI.
 +const char kMetachatMode[]               = "metachat-mode";
++// MetaChat: comma-separated IDC command names to block (e.g. "IDC_PRINT").
++// Only checked when --metachat-mode is active.
++const char kMetachatModeBlockList[]      = "metachat-mode-blocklist";
++// MetaChat: comma-separated IDC command names to unblock from default list.
++// Takes precedence over both default and --metachat-mode-blocklist.
++const char kMetachatModeAllowList[]      = "metachat-mode-allowlist";
 +
  // There are several parameters that we work around to remove the
  // "expose" C++ concept from the DevTools protocol.
