@@ -12,6 +12,7 @@ env:
   CHROMIUM_TAG: ${{ github.event.inputs.chromium_tag || '150.0.7844.0' }}
   CHROMIUM_DIR: C:\chromium
   SRC_DIR: C:\chromium\src
+  FISH_COMMIT: a64c8adb6a35ed4b2dcecf48661b9af9be8532db
 
 jobs:
   build:
@@ -23,45 +24,29 @@ jobs:
 
       - name: Setup depot_tools
         shell: pwsh
-        run: git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git C:\depot_tools && echo "C:\depot_tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        run: git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git C:\depot_tools; echo "C:\depot_tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Setup VS2022
         shell: pwsh
-        run: choco install visualstudio2022buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended" -y && choco install windows-sdk-10.0 -y
+        run: choco install visualstudio2022buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended" -y; choco install windows-sdk-10.0 -y
 
-      - name: Fetch Chromium source
+      - name: Fetch Chromium source (ChromiumFish fork)
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path $env:CHROMIUM_DIR
           cd $env:CHROMIUM_DIR
           fetch --nohooks --no-history chromium
           cd src
-          git fetch origin refs/tags/$env:CHROMIUM_TAG:refs/tags/$env:CHROMIUM_TAG --depth=1
-          git checkout $env:CHROMIUM_TAG
+          git remote add fish https://github.com/chromiumfish/chromium.git
+          git fetch fish $env:FISH_COMMIT --depth=1
+          git checkout $env:FISH_COMMIT
           gclient sync --with_branch_heads --with_tags --nohooks -D
-
-      - name: Apply ChromiumFish patches
-        shell: pwsh
-        run: |
-          $repo = "$env:GITHUB_WORKSPACE\browser"
-          cd $env:SRC_DIR
-          Get-Content "$repo\patches\series" | ForEach-Object {
-            $patch = $_.Trim()
-            if ($patch -and $patch -notmatch "^#") {
-              $patchFile = "$repo\patches\$patch"
-              if (Test-Path $patchFile) {
-                Write-Host "Applying: $patch"
-                git apply --reject --whitespace=fix $patchFile 2>&1
-              }
-            }
-          }
-          $rejFiles = Get-ChildItem -Recurse -Filter "*.rej" -Name
-          if ($rejFiles) { Write-Host "REJECTED" -ForegroundColor Red; $rejFiles; exit 1 }
-          Write-Host "All patches applied" -ForegroundColor Green
 
       - name: Overlay assets
         shell: pwsh
-        run: robocopy "$env:GITHUB_WORKSPACE\browser\assets" "$env:SRC_DIR" /MIR /NJH /NJS /NP
+        run: |
+          $src = "$env:GITHUB_WORKSPACE\browser\assets"
+          if (Test-Path $src) { robocopy $src "$env:SRC_DIR" /MIR /NJH /NJS /NP }
 
       - name: Apply MetaChat patches
         shell: pwsh
@@ -70,26 +55,30 @@ jobs:
           if (Test-Path $patchDir) {
             Get-ChildItem "$patchDir\*.patch" | Sort-Object Name | ForEach-Object {
               Write-Host "MetaChat: $($_.Name)"
-              cd $env:SRC_DIR; git apply --reject --whitespace=fix $_.FullName 2>&1
+              cd $env:SRC_DIR
+              git apply --reject --whitespace=fix $_.FullName 2>&1
             }
-            $rejFiles = Get-ChildItem -Recurse -Filter "*.rej" -Name
-            if ($rejFiles) { Write-Host "REJECTED" -ForegroundColor Red; $rejFiles; exit 1 }
-          } else { Write-Host "No MetaChat patches" -ForegroundColor Yellow }
+            $rejCount = (Get-ChildItem -Recurse -Filter "*.rej" -Name).Count
+            if ($rejCount -gt 0) { Write-Host "FAILED: $rejCount reject files" -ForegroundColor Red; exit 1 }
+            Write-Host "All MetaChat patches applied OK" -ForegroundColor Green
+          }
 
       - name: Build overrides
         shell: pwsh
-        run: New-Item -ItemType Directory -Force -Path $env:SRC_DIR\build_overrides; Set-Content -Path $env:SRC_DIR\build_overrides\pdfium.gni -Value "declare_args() { pdf_bundle_freetype_override = false }"
+        run: New-Item -ItemType Directory -Force -Path "$env:SRC_DIR\build_overrides"; Set-Content -Path "$env:SRC_DIR\build_overrides\pdfium.gni" -Value "declare_args() { pdf_bundle_freetype_override = false }"
 
       - name: Download toolchains
         shell: pwsh
         run: |
           cd $env:SRC_DIR
-          python3 tools\clang\scripts\update.py 2>&1
-          python3 tools\rust\update_rust.py 2>&1
+          python3 tools\clang\scripts\update.py
+          python3 tools\rust\update_rust.py
 
       - name: Configure GN
         shell: pwsh
-        run: New-Item -ItemType Directory -Force -Path out\Release_GN_x64; Set-Content -Path out\Release_GN_x64\args.gn -Value "is_debug = false`nis_component_build = false`nsymbol_level = 0`nblink_symbol_level = 0`nv8_symbol_level = 0`nenable_nacl = false`nenable_remoting = false`nenable_extensions = true`nenable_plugins = true`nenable_widevine = false`nenable_swiftshader = false`nenable_pdf = true`nenable_pdfium = true`nenable_printing = true`nenable_print_preview = true`ntreat_warnings_as_errors = false`ngoogle_api_key = ""`nuse_unofficial_version_number = false`nchrome_pgo_phase = 0`nenable_extensions_core = true`ndawn_enable_vulkan_validation_layers = false`nangle_enable_vulkan_validation_layers = false"
+        run: |
+          New-Item -ItemType Directory -Force -Path out\Release_GN_x64
+          Set-Content -Path out\Release_GN_x64\args.gn -Value ("is_debug = false" + [char]10 + "is_component_build = false" + [char]10 + "symbol_level = 0" + [char]10 + "blink_symbol_level = 0" + [char]10 + "v8_symbol_level = 0" + [char]10 + "enable_nacl = false" + [char]10 + "enable_remoting = false" + [char]10 + "enable_extensions = true" + [char]10 + "enable_plugins = true" + [char]10 + "enable_widevine = false" + [char]10 + "enable_swiftshader = false" + [char]10 + "enable_pdf = true" + [char]10 + "enable_pdfium = true" + [char]10 + "enable_printing = true" + [char]10 + "enable_print_preview = true" + [char]10 + "treat_warnings_as_errors = false" + [char]10 + "google_api_key = """ + [char]10 + "use_unofficial_version_number = false" + [char]10 + "chrome_pgo_phase = 0" + [char]10 + "enable_extensions_core = true" + [char]10 + "dawn_enable_vulkan_validation_layers = false" + [char]10 + "angle_enable_vulkan_validation_layers = false")
 
       - name: Build
         shell: pwsh
@@ -105,7 +94,7 @@ jobs:
           Copy-Item "$outDir\*.dll" $dest
           Copy-Item "$outDir\*.pak" $dest
           Copy-Item "$outDir\*.bin" $dest -ErrorAction SilentlyContinue
-          Copy-Item -Recurse "$outDir\locales" $dest -ErrorAction SilentlyContinue
+          if (Test-Path "$outDir\locales") { Copy-Item -Recurse "$outDir\locales" $dest }
           Compress-Archive -Path "$dest\*" -DestinationPath "${{ github.workspace }}\metachat-browser-windows.zip" -Force
 
       - uses: actions/upload-artifact@v4
