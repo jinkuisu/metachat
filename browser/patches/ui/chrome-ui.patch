@@ -83,7 +83,6 @@ index ed69c678e9a8d..d206338d33205 100644
 +// Only active when --metachat-mode is set.
 +bool IsLightweightForkBlockedCommand(int id) {
 +  // Allowlist check: if id is explicitly allowed, return false.
-+  static std::set<int> s_allowlist = []() {  // Allowlist check: if id is explicitly allowed, return false.
 +  static std::set<int> s_allowlist = []() {
 +    std::set<int> ids;
 +    std::string list = base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
