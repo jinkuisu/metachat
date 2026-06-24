@@ -6,7 +6,7 @@ index 6fada0a2b1a1f..39c9a98bdadd1 100644
  	<key>CFBundleDevelopmentRegion</key>
  	<string>en</string>
  	<key>CFBundleDisplayName</key>
--	<string></string>
+-	<string>${EXECUTABLE_NAME}</string>
 +	<string>MetaChat</string>
  	<key>CFBundleDocumentTypes</key>
  	<array>

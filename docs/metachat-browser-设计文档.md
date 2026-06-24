@@ -1,4 +1,4 @@
-﻿# MetaChat Browser · 技术设计方案
+﻿﻿# MetaChat Browser · 技术设计方案
 
 > 版本：v1.0
 > 日期：2026-06-24
@@ -60,22 +60,89 @@ metachat/patches/
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | --metachat-mode | 开关 | 无 | 启用 MetaChat 模式（隐藏原生 UI） |
+| --metachat-mode-allowlist | 字符串 | 空 | 逗号分隔的 IDC 命令 ID，即使在默认拦截列表中也放行 |
+| --metachat-mode-blocklist | 字符串 | 空 | 逗号分隔的 IDC 命令 ID，额外拦截 |
+| --metachat-accounts-config | 路径 | accounts.json | 账号配置文件路径 |
 
-### 3.3 核心机制：per-WebContents 指纹
+启动示例：
+```bash
+MetaChat.exe --metachat-mode --metachat-accounts-config=C:/Users/xxx/metachat-accounts.json
+```
 
-ChromiumFish 原有的 ingerprinting::Current() 是进程级单例，所有标签页共享同一个指纹。
-MetaChat 将其改为每个 WebContents 独立管理：
+### 3.3 核心机制：per-profile 指纹隔离
 
-`
-fingerprinting::Current()  → 进程级（默认，向后兼容）
-fingerprinting::GetForWebContents(contents)  → 每个 WebContents 独立
-`
+#### 3.3.1 背景
 
-通过 CDP 扩展命令设置每个标签页的指纹种子：
+ChromiumFish 的 `fingerprinting::Current()` 是 **进程级单例**，所有 WebContents 共享同一个指纹。
+MetaChat 需要**每个账号独立指纹**，不同账号的指纹必须完全隔离（C++ 引擎级别，非 JS 注入）。
 
-`
-Browser.setTabFingerprintSeed({ webContentsId: "...", seed: "..." })
-`
+#### 3.3.2 方案：每账号独立 Profile + AppendExtraCommandLineSwitches 注入
+
+```
+browser 进程
+  MetaChatAccountStore (管理 accounts.json)
+    |- Account A -> user_data_dir=Profile_A, persona_seed=6847...
+    |- Account B -> user_data_dir=Profile_B, persona_seed=1928...
+    |- Account C -> user_data_dir=Profile_C, persona_seed=8374...
+
+  ChromeContentBrowserClient::AppendExtraCommandLineSwitches()
+    |- child_process_id -> RenderProcessHost::FromID() OK（构造函数已注册）
+    |- RPH -> GetBrowserContext() -> GetPath() -> profile 路径
+    |- 查 MetaChatAccountStore 拿到 persona_seed
+       -> command_line->AppendSwitchASCII(persona-seed, seed)
+
+renderer 进程 A                renderer 进程 B
+  persona-seed=A               persona-seed=B
+  DeriveFromSeed               DeriveFromSeed
+  -> 指纹 A                    -> 指纹 B
+```
+
+**关键保证：**
+
+- **不同 profile 的 renderer 进程天然隔离** -- Chromium 不会让不同 BrowserContext 的 WebContents 复用同一 renderer 进程
+- **RenderProcessHost::FromID() 在 AppendExtraCommandLineSwitches 调用时已可用** -- RegisterHost() 在构造函数中调用，早于 Init() 中 AppendExtraCommandLineSwitches 的调用
+- **Fish 的 kSwitchNames[] 仍保留 kPersonaSeed** -- 作为全局 fallback（Spare RenderProcessHost 等场景）
+
+#### 3.3.3 补丁修改清单
+
+| 补丁 | 修改内容 |
+|------|---------|
+| persona-seed.patch（Fish） | 不修改。保留 kPersonaSeed 在 kSwitchNames[] 中作为 fallback |
+| 0004-profile-seed.patch（新） | ChromeContentBrowserClient::AppendExtraCommandLineSwitches() 中通过 child_process_id -> RPH -> BrowserContext -> persona_seed 覆盖注入 |
+
+#### 3.3.4 accounts.json 格式
+
+```json
+{
+  "version": 1,
+  "accounts": [
+    {
+      "id": "wa_work",
+      "name": "工作号",
+      "platform": "whatsapp",
+      "url": "https://web.whatsapp.com",
+      "user_data_dir": "Profile_WhatsApp_Work",
+      "persona_seed": "684729103847201",
+      "proxy": null
+    },
+    {
+      "id": "tg_personal",
+      "name": "个人号",
+      "platform": "telegram",
+      "url": "https://web.telegram.org",
+      "user_data_dir": "Profile_Telegram_Personal",
+      "persona_seed": "192837465012384",
+      "proxy": null
+    }
+  ]
+}
+```
+
+> **MVP 阶段只开放 persona_seed**。用户只需要给不同账号不同 seed，Fish 的 DeriveFromSeed() 自动生成全套一致的指纹（UA、WebGL、音频、Canvas、屏幕等 30+ 维度）。
+>
+> **Phase 2** 可扩展 persona_overrides 字段，支持精细控制特定维度，同时保持 Fish 默认池的一致性保证。
+
+#### 3.3.5 后台账号管理
 
 后台账号的 WebContents 设为 OCCLUDED 状态：
 - JS 继续运行（能接收消息）
@@ -83,7 +150,29 @@ Browser.setTabFingerprintSeed({ webContentsId: "...", seed: "..." })
 - 释放显存
 - 切换到前台时立即恢复全功率
 
-### 3.4 通用 Overlay 容器
+#### 3.3.6 Phase 2 扩展：persona_overrides
+
+```json
+{
+  "accounts": [
+    {
+      "id": "wa_1",
+      "persona_seed": "111",
+      "persona_overrides": {
+        "os": "mac",
+        "screen_width": 2560,
+        "screen_height": 1600,
+        "hardware_concurrency": 10,
+        "webgl_renderer": "Apple M2",
+        "timezone": "America/New_York",
+        "locale": "en-US"
+      }
+    }
+  ]
+}
+```
+
+支持按 **指纹模板** 管理模板库，多账号共享同一模板。### 3.4 通用 Overlay 容器
 
 引擎层只提供一个 Overlay 容器（Widget），用于承载所有悬浮 UI：
 
