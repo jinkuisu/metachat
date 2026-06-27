@@ -1,5 +1,44 @@
+diff --git a/chrome/browser/chrome_content_browser_client.cc b/chrome/browser/chrome_content_browser_client.cc
+index f3b2100ae4387..e97aa1176dc43 100644
+--- a/chrome/browser/chrome_content_browser_client.cc
++++ b/chrome/browser/chrome_content_browser_client.cc
+@@ -16,6 +16,7 @@
+ #include <vector>
+ 
+ #include "base/base_switches.h"
++#include "base/hash/hash.h"
+ #include "base/byte_count.h"
+ #include "base/check_deref.h"
+ #include "base/check_op.h"
+@@ -3156,6 +3157,26 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
+                                     switches::kChangeStackGuardOnForkEnabled);
+   }
+ #endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
++
++  // MetaChat: per-profile fingerprint persona seed.
++  // Each profile derives a unique seed from its directory path.
++  // Same profile path -> same seed -> same fingerprint.
++  // Different profile -> different seed -> different fingerprint.
++  if (process_type == switches::kRendererProcess) {
++    content::RenderProcessHost* process =
++        content::RenderProcessHost::FromID(child_process_id);
++    if (process) {
++      Profile* profile =
++          Profile::FromBrowserContext(process->GetBrowserContext());
++      if (profile) {
++        command_line->AppendSwitchASCII(
++            switches::kPersonaSeed,
++            base::NumberToString(
++                base::PersistentHash(
++                    profile->GetPath().BaseName().AsUTF8Unsafe())));
++      }
++    }
++  }
+ }
+ 
+ std::string
 diff --git a/content/browser/renderer_host/render_process_host_impl.cc b/content/browser/renderer_host/render_process_host_impl.cc
-index 2e1c77eaaca9a..17493057ca21e 100644
+index 2e1c77eaaca9a..8ee0efb66ab27 100644
 --- a/content/browser/renderer_host/render_process_host_impl.cc
 +++ b/content/browser/renderer_host/render_process_host_impl.cc
 @@ -71,6 +71,7 @@
@@ -10,17 +49,16 @@ index 2e1c77eaaca9a..17493057ca21e 100644
  #include "components/embedder_support/switches.h"
  #include "components/input/features.h"
  #include "components/input/utils.h"
-@@ -3839,6 +3840,9 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
+@@ -3838,7 +3839,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
+       switches::kDisableV8IdleTasks,
        switches::kDisableVideoCaptureUseGpuMemoryBuffer,
        switches::kDomAutomationController,
-       switches::kEnableAutomation,
-+      // Lightweight-fork: forward the fingerprint persona seed so every
-+      // renderer derives the same persona as the browser process.
+-      switches::kEnableAutomation,
 +      switches::kPersonaSeed,
        switches::kEnableExperimentalAccessibilityLanguageDetection,
        switches::kEnableExperimentalAccessibilityLabelsDebugging,
        switches::kEnableExperimentalWebPlatformFeatures,
-@@ -3980,6 +3984,12 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
+@@ -3980,6 +3981,12 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
  #if BUILDFLAG(IS_CHROMEOS)
        switches::kSchedulerBoostUrgent,
  #endif
@@ -28,7 +66,7 @@ index 2e1c77eaaca9a..17493057ca21e 100644
 +      canvas_bridge::switches::kCanvasBridgeAuth,
 +      // ChromiumFish persona-os switch — must reach the renderer so
 +      // fingerprint_profile.cc reads it in DeriveFromSeed. (persona-seed
-+      // is already forwarded above via switches::kPersonaSeed.)
++      // is now injected per-profile in ChromeContentBrowserClient.)
 +      "persona-os",
    };
    renderer_cmd->CopySwitchesFrom(browser_cmd, kSwitchNames);
