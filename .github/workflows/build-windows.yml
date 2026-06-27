@@ -6,10 +6,10 @@ on:
       chromium_commit:
         description: "Chromium base commit"
         required: true
-        default: "a64c8adb6a201e1dda195716f5f286047625b4c8"
+        default: "150.0.7844.0"
 
 env:
-  CHROMIUM_COMMIT: ${{ github.event.inputs.chromium_commit || 'a64c8adb6a201e1dda195716f5f286047625b4c8' }}
+  CHROMIUM_COMMIT: ${{ github.event.inputs.chromium_commit || '150.0.7844.0' }}
   CHROMIUM_DIR: C:\chromium
   SRC_DIR: C:\chromium\src
 
@@ -35,20 +35,19 @@ jobs:
           choco install visualstudio2022buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended" -y
           choco install windows-sdk-10.0 -y
 
-      - name: Fetch Chromium source at Fish baseline commit
+      - name: Fetch Chromium source
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path $env:CHROMIUM_DIR
           cd $env:CHROMIUM_DIR
           fetch --nohooks --no-history chromium
           cd src
-          # ChromiumFish's upstream commit (a64c8adb6a) corresponds to
-          # Chromium ~150.0.7844.x. Checkout this exact commit.
-          git fetch origin $env:CHROMIUM_COMMIT --depth=1
+          # Chromium 150.0.7844.0 鈥?matched to ChromiumFish version
+          git fetch origin tag $env:CHROMIUM_COMMIT --depth=1
           git checkout $env:CHROMIUM_COMMIT
           gclient sync --with_branch_heads --with_tags --nohooks -D
 
-      - name: Apply ChromiumFish patches
+      - name: Apply patches
         shell: pwsh
         run: |
           $metachat = "$env:GITHUB_WORKSPACE\metachat"
@@ -61,18 +60,18 @@ jobs:
               if ($patch -and $patch -notmatch "^#") {
                 $patchFile = "$patchRoot\$patch"
                 if (Test-Path $patchFile) {
-                  Write-Host "Fish: $patch"
+                  Write-Host "Patch: $patch"
                   git apply --reject --whitespace=fix $patchFile 2>&1
                 }
               }
             }
             $rejCount = (Get-ChildItem -Recurse -Filter "*.rej" -Name).Count
             if ($rejCount -gt 0) {
-              Write-Host "FISH PATCHES FAILED: $rejCount reject files" -ForegroundColor Red
+              Write-Host "PATCHES FAILED: $rejCount reject files" -ForegroundColor Red
               Get-ChildItem -Recurse -Filter "*.rej" | Select-Object -ExpandProperty FullName
               exit 1
             }
-            Write-Host "All Fish patches applied OK" -ForegroundColor Green
+            Write-Host "All patches applied OK" -ForegroundColor Green
           }
 
       - name: Overlay assets
@@ -81,23 +80,6 @@ jobs:
           $src = "$env:GITHUB_WORKSPACE\metachat\browser\assets"
           if (Test-Path $src) { robocopy $src "$env:SRC_DIR" /MIR /NJH /NJS /NP }
 
-      - name: Apply MetaChat patches
-        shell: pwsh
-        run: |
-          $patchDir = "$env:GITHUB_WORKSPACE\metachat\browser\metachat-patches"
-          if (Test-Path $patchDir) {
-            cd $env:SRC_DIR
-            Get-ChildItem "$patchDir\*.patch" | Sort-Object Name | ForEach-Object {
-              Write-Host "MetaChat: $($_.Name)"
-              git apply --reject --whitespace=fix $_.FullName 2>&1
-            }
-            $rejCount = (Get-ChildItem -Recurse -Filter "*.rej" -Name).Count
-            if ($rejCount -gt 0) {
-              Write-Host "METACHAT PATCHES FAILED: $rejCount reject files" -ForegroundColor Red
-              exit 1
-            }
-            Write-Host "All MetaChat patches applied OK" -ForegroundColor Green
-          }
 
       - name: Build overrides
         shell: pwsh
@@ -162,3 +144,4 @@ jobs:
         with:
           name: metachat-browser-windows
           path: metachat-browser-windows.zip
+

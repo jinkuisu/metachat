@@ -1,3 +1,41 @@
+# MetaChat chrome-ui.patch
+# Merged from: Fish chrome-ui.patch + MetaChat 0002-switches.patch
+# Fish: UI hiding, command blocking, NTP → about:blank, WebUI route closure
+# MetaChat: --metachat-mode, --metachat-mode-block-list, --metachat-mode-allow-list
+diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
+index e061d34f1404d..5fa56a29ecd52 100644
+--- a/chrome/browser/ui/browser_command_controller.cc
++++ b/chrome/browser/ui/browser_command_controller.cc
+@@ -18,6 +18,9 @@
+ #include "base/i18n/rtl.h"
+ #include "base/metrics/histogram_functions.h"
+ #include "base/metrics/user_metrics.h"
++#include "base/strings/string_number_conversions.h"
++#include "base/strings/string_split.h"
++#include "chrome/common/chrome_switches.h"
+ #include "base/notimplemented.h"
+ #include "base/time/time.h"
+ #include "build/branding_buildflags.h"
+diff --git a/chrome/common/chrome_switches.h b/chrome/common/chrome_switches.h
+index 9cc7da2196cc5..e47104237a6e9 100644
+--- a/chrome/common/chrome_switches.h
++++ b/chrome/common/chrome_switches.h
+@@ -45,6 +45,14 @@ extern const char kAllowHttpScreenCapture[];
+ extern const char kAllowRunningInsecureContent[];
+ extern const char kAllowSilentPush[];
+ extern const char kAllowUnpackedPerfettoExtension[];
++// MetaChat: --metachat-mode activates the MetaChat Browser environment.
++extern const char kMetachatMode[];
++// MetaChat: comma-separated list of IDC command IDs to additionally block
++// when --metachat-mode is active. Overrides the default blocklist.
++extern const char kMetachatModeBlockList[];
++// MetaChat: comma-separated list of IDC command IDs to allow even when
++// they are on the default blocklist. Takes precedence over blocklist.
++extern const char kMetachatModeAllowList[];
+ extern const char kAllowUnsafeDevToolsRemoteFileLoading[];
+ extern const char kApp[];
+ extern const char kAppId[];
+
 diff --git a/chrome/browser/app_controller_mac.mm b/chrome/browser/app_controller_mac.mm
 index ae5df201946d0..7a58dbc28acb3 100644
 --- a/chrome/browser/app_controller_mac.mm
@@ -78,30 +116,7 @@ index ed69c678e9a8d..d206338d33205 100644
    }
  }
  
-+// MetaChat: configurable command blocklist for --metachat-mode.
-+// Reads --metachat-mode-allowlist and --metachat-mode-blocklist.
-+// Only active when --metachat-mode is set.
 +bool IsLightweightForkBlockedCommand(int id) {
-+  // Allowlist check: if id is explicitly allowed, return false.
-+  static std::set<int> s_allowlist = []() {
-+    std::set<int> ids;
-+    std::string list = base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
-+        switches::kMetachatModeAllowList);
-+    if (list.empty()) return ids;
-+    for (const auto& name : base::SplitString(
-+             list, ",", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY)) {
-+      int cmd_id = 0;
-+      if (base::StringToInt(name, &cmd_id)) {
-+        ids.insert(cmd_id);
-+      }
-+    }
-+    return ids;
-+  }();
-+  if (s_allowlist.find(id) != s_allowlist.end()) {
-+    return false;
-+  }
-+
-+  // Default blocklist
 +  switch (id) {
 +    // Host/file integration.
 +    case IDC_OPEN_FILE:
@@ -150,6 +165,10 @@ index ed69c678e9a8d..d206338d33205 100644
 +    case IDC_SHOW_SIGNIN:
 +    case IDC_SHOW_SIGNIN_WHEN_PAUSED:
 +    // Extensions and Chrome Web Store UI.
++    case IDC_MANAGE_EXTENSIONS:
++    case IDC_SAFETY_HUB_MANAGE_EXTENSIONS:
++    case IDC_EXTENSIONS_SUBMENU_MANAGE_EXTENSIONS:
++    case IDC_EXTENSIONS_SUBMENU_VISIT_CHROME_WEB_STORE:
 +    // Password manager, payments, autofill, safety hub, sharing, side panels.
 +    case IDC_PASSWORDS_AND_AUTOFILL_MENU:
 +    case IDC_SHOW_PASSWORD_MANAGER:
@@ -172,6 +191,7 @@ index ed69c678e9a8d..d206338d33205 100644
 +    case IDC_SHOW_CUSTOMIZE_CHROME_TOOLBAR:
 +    case IDC_CUSTOMIZE_CHROME:
 +    case IDC_SHOW_CHROME_LABS:
++    case IDC_SHOW_MANAGEMENT_PAGE:
 +    // Translation surfaces (UI + context menu offers).
 +    case IDC_SHOW_TRANSLATE:
 +    case IDC_CONTENT_CONTEXT_TRANSLATE:
@@ -195,25 +215,8 @@ index ed69c678e9a8d..d206338d33205 100644
 +    case IDC_VIEW_PASSWORDS:
 +      return true;
 +    default:
-+      break;
++      return false;
 +  }
-+
-+  // Custom blocklist from --metachat-mode-blocklist.
-+  static std::set<int> s_blocklist = []() {
-+    std::set<int> ids;
-+    std::string list = base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
-+        switches::kMetachatModeBlockList);
-+    if (list.empty()) return ids;
-+    for (const auto& name : base::SplitString(
-+             list, ",", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY)) {
-+      int cmd_id = 0;
-+      if (base::StringToInt(name, &cmd_id)) {
-+        ids.insert(cmd_id);
-+      }
-+    }
-+    return ids;
-+  }();
-+  return s_blocklist.find(id) != s_blocklist.end();
 +}
 +
  bool CanOpenFile(Browser* browser) {
@@ -665,7 +668,8 @@ index dd37ab85cec11..4ff23f0e8ab8c 100644
  const GURL& ChromeUINewTabURLAsGURL() {
 -  static base::NoDestructor<GURL> instance(kChromeUINewTabURL);
 +  // Lightweight-fork: blank NTP instead of the Google-branded chrome://newtab.
-+  static base::NoDestructor<GURL> instance("chrome://metachat/");
++  static base::NoDestructor<GURL> instance("about:blank");
    return *instance;
  }
  
+

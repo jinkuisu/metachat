@@ -46,7 +46,7 @@ index e60e454815d33..dea9295f2fe06 100644
    DCHECK_CALLED_ON_VALID_SEQUENCE(main_thread_sequence_checker_);
    DCHECK(destination());
  
--  DeferredTaskHandler::GraphAutoLocker locker(this);
+-  DeferredTaskHandler::GraphAutoLocker locker(GetDeferredTaskHandler());
 -
 -  double factor = GetOutputLatencyQuantizingFactor();
 -  return std::round(output_position_.hardware_output_latency / factor) * factor;
