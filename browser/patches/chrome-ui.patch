@@ -16,6 +16,7 @@ index e061d34f1404d..5fa56a29ecd52 100644
  #include "base/notimplemented.h"
  #include "base/time/time.h"
  #include "build/branding_buildflags.h"
+
 diff --git a/chrome/common/chrome_switches.h b/chrome/common/chrome_switches.h
 index 9cc7da2196cc5..e47104237a6e9 100644
 --- a/chrome/common/chrome_switches.h
@@ -35,6 +36,7 @@ index 9cc7da2196cc5..e47104237a6e9 100644
  extern const char kAllowUnsafeDevToolsRemoteFileLoading[];
  extern const char kApp[];
  extern const char kAppId[];
+
 
 diff --git a/chrome/browser/app_controller_mac.mm b/chrome/browser/app_controller_mac.mm
 index ae5df201946d0..7a58dbc28acb3 100644
@@ -108,6 +110,7 @@ index ae5df201946d0..7a58dbc28acb3 100644
  }
  
  - (void)initShareMenu {
+
 diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
 index ed69c678e9a8d..d206338d33205 100644
 --- a/chrome/browser/ui/browser_command_controller.cc
@@ -257,6 +260,7 @@ index ed69c678e9a8d..d206338d33205 100644
    // Doesn't go through the command_updater_ to avoid dealing with having a
    // naming collision for ExecuteCommandWithDisposition (both
    // CommandUpdaterDelegate and CommandUpdater declare this function so we
+
 diff --git a/chrome/browser/ui/read_anything/read_anything_entry_point_controller.cc b/chrome/browser/ui/read_anything/read_anything_entry_point_controller.cc
 index 26feac287c1f6..e3d8dbfa60403 100644
 --- a/chrome/browser/ui/read_anything/read_anything_entry_point_controller.cc
@@ -279,6 +283,7 @@ index 26feac287c1f6..e3d8dbfa60403 100644
  }
  
  // static
+
 diff --git a/chrome/browser/ui/startup/bad_flags_prompt.cc b/chrome/browser/ui/startup/bad_flags_prompt.cc
 index 0deb93f45504c..47fc835cc2dde 100644
 --- a/chrome/browser/ui/startup/bad_flags_prompt.cc
@@ -316,6 +321,7 @@ index 0deb93f45504c..47fc835cc2dde 100644
  // On Android, ShowBadFlagsPrompt doesn't show the warning notification
  // for flags which are not available in about:flags.
  #if !BUILDFLAG(IS_ANDROID)
+
 diff --git a/chrome/browser/ui/startup/infobar_utils.cc b/chrome/browser/ui/startup/infobar_utils.cc
 index 4907b9a951040..27d7e2ae0f986 100644
 --- a/chrome/browser/ui/startup/infobar_utils.cc
@@ -368,6 +374,7 @@ index 4907b9a951040..27d7e2ae0f986 100644
  
    if (ObsoleteSystem::IsObsoleteNowOrSoon()) {
      PrefService* local_state = g_browser_process->local_state();
+
 diff --git a/chrome/browser/ui/toolbar/app_menu_model.cc b/chrome/browser/ui/toolbar/app_menu_model.cc
 index 196c09329841a..01fe742f0037c 100644
 --- a/chrome/browser/ui/toolbar/app_menu_model.cc
@@ -429,6 +436,7 @@ index 196c09329841a..01fe742f0037c 100644
  }
  
  void AppMenuModel::CreateCutCopyPasteMenu() {
+
 diff --git a/chrome/browser/ui/views/bookmarks/bookmark_page_action_controller.cc b/chrome/browser/ui/views/bookmarks/bookmark_page_action_controller.cc
 index 1388bf93a47c4..c2e4ba2a2f11c 100644
 --- a/chrome/browser/ui/views/bookmarks/bookmark_page_action_controller.cc
@@ -461,6 +469,7 @@ index 1388bf93a47c4..c2e4ba2a2f11c 100644
  }
  
  void BookmarkPageActionController::SetStarred(bool starred) {
+
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
 index 787771d2e8fcb..b8c6954de99b4 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
@@ -483,6 +492,7 @@ index 787771d2e8fcb..b8c6954de99b4 100644
  }
  
  bool BrowserView::MaybeShowInfoBar(WebContents* contents) {
+
 diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.cc b/chrome/browser/ui/views/location_bar/location_bar_view.cc
 index ef701ccfec136..6d9f62c6f3ce0 100644
 --- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
@@ -533,6 +543,7 @@ index ef701ccfec136..6d9f62c6f3ce0 100644
      location_icon_view_->SetVisible(false);
    }
  
+
 diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
 index a45396e6e3db3..95dc7b5c98613 100644
 --- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
@@ -573,17 +584,30 @@ index a45396e6e3db3..95dc7b5c98613 100644
  
    if (base::FeatureList::IsEnabled(contextual_tasks::kContextualTasks) &&
        contextual_tasks::GetExpandButtonOption() ==
-diff --git a/chrome/browser/ui/webui/chrome_web_ui_configs.cc b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
-index 76fa678e056b4..9d9a50254b896 100644
+
 --- a/chrome/browser/ui/webui/chrome_web_ui_configs.cc
 +++ b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
-@@ -294,11 +294,13 @@ void RegisterChromeWebUIConfigs() {
+@@ -185,6 +185,7 @@
+ #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+     BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_DESKTOP_ANDROID)
+ #include "chrome/browser/ui/webui/discards/discards_ui.h"
++#include "chrome/browser/ui/webui/metachat/metachat_ui.h"
+ #include "chrome/browser/ui/webui/management/management_ui.h"
+ #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||
+         // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_DESKTOP_ANDROID)
+@@ -247,6 +248,7 @@
+   map.AddWebUIConfig(std::make_unique<AccessibilityUIConfig>());
+   map.AddWebUIConfig(
+       std::make_unique<AccessibilityAnnotatorInternalsUIConfig>());
++  map.AddWebUIConfig(std::make_unique<MetaChatUIConfig>());
+   map.AddWebUIConfig(std::make_unique<AutofillInternalsUIConfig>());
+   map.AddWebUIConfig(std::make_unique<BluetoothInternalsUIConfig>());
+   map.AddWebUIConfig(std::make_unique<BrowsingTopicsInternalsUIConfig>());
+@@ -294,11 +296,11 @@
            security_interstitials::KnownInterceptionDisclosureUIConfig>());
    map.AddWebUIConfig(std::make_unique<SavedTabGroupsUnsupportedUIConfig>());
    map.AddWebUIConfig(std::make_unique<SegmentationInternalsUIConfig>());
 -  map.AddWebUIConfig(std::make_unique<SignInInternalsUIConfig>());
-+  // Lightweight-fork: signin/sync internals dropped — no signin/sync in
-+  // this fork, so the internals pages have nothing to show.
 +  // map.AddWebUIConfig(std::make_unique<SignInInternalsUIConfig>());
    map.AddWebUIConfig(std::make_unique<
                       subresource_filter::SubresourceFilterInternalsUIConfig>());
@@ -593,17 +617,12 @@ index 76fa678e056b4..9d9a50254b896 100644
    map.AddWebUIConfig(std::make_unique<TranslateInternalsUIConfig>());
    map.AddWebUIConfig(std::make_unique<UsbInternalsUIConfig>());
    map.AddWebUIConfig(std::make_unique<user_actions_ui::UserActionsUIConfig>());
-@@ -337,18 +339,26 @@ void RegisterChromeWebUIConfigs() {
+@@ -337,16 +339,16 @@
    map.AddWebUIConfig(std::make_unique<actor::ui::ActorOverlayUIConfig>());
    map.AddWebUIConfig(std::make_unique<AppServiceInternalsUIConfig>());
    map.AddWebUIConfig(std::make_unique<AutofillMlInternalsUIConfig>());
 -  map.AddWebUIConfig(std::make_unique<BookmarksSidePanelUIConfig>());
 -  map.AddWebUIConfig(std::make_unique<BookmarksUIConfig>());
-+  // Lightweight-fork (FINGERPRINT_ISOLATION_PLAN.md task #7, WebUI-route
-+  // closure): bookmarks/downloads/feedback/history are user-facing surfaces
-+  // already blocked at command-level via IsLightweightForkBlockedCommand;
-+  // dropping their WebUIConfig here also closes direct chrome:// URL
-+  // navigation (otherwise typing the URL still resolves the page).
 +  // map.AddWebUIConfig(std::make_unique<BookmarksSidePanelUIConfig>());
 +  // map.AddWebUIConfig(std::make_unique<BookmarksUIConfig>());
    map.AddWebUIConfig(std::make_unique<ColorPipelineInternalsUIConfig>());
@@ -613,63 +632,152 @@ index 76fa678e056b4..9d9a50254b896 100644
 +  // map.AddWebUIConfig(std::make_unique<DownloadsUIConfig>());
    map.AddWebUIConfig(std::make_unique<DrivePickerHostUIConfig>());
    map.AddWebUIConfig(std::make_unique<glic::GlicExperimentalOptInUIConfig>());
--  map.AddWebUIConfig(std::make_unique<FeedbackUIConfig>());
+   map.AddWebUIConfig(std::make_unique<FeedbackUIConfig>());
 -  map.AddWebUIConfig(std::make_unique<HistoryUIConfig>());
--  map.AddWebUIConfig(std::make_unique<HistorySidePanelUIConfig>());
--  map.AddWebUIConfig(std::make_unique<HistoryClustersSidePanelUIConfig>());
-+  // FeedbackUIConfig: chrome.send("showDialog") with --disable-features=
-+  // Translate,MediaRouter,...  hits NOTREACHED in WebUIImpl, crashing the
-+  // browser. Drop the config to fully close the route.
-+  // map.AddWebUIConfig(std::make_unique<FeedbackUIConfig>());
 +  // map.AddWebUIConfig(std::make_unique<HistoryUIConfig>());
-+  // map.AddWebUIConfig(std::make_unique<HistorySidePanelUIConfig>());
-+  // map.AddWebUIConfig(std::make_unique<HistoryClustersSidePanelUIConfig>());
+   map.AddWebUIConfig(std::make_unique<HistorySidePanelUIConfig>());
+   map.AddWebUIConfig(std::make_unique<HistoryClustersSidePanelUIConfig>());
    map.AddWebUIConfig(std::make_unique<InfobarInternalsUIConfig>());
-   map.AddWebUIConfig(std::make_unique<InspectUIConfig>());
- #if BUILDFLAG(ENABLE_SESSION_SERVICE)
-@@ -368,13 +378,17 @@ void RegisterChromeWebUIConfigs() {
-   map.AddWebUIConfig(std::make_unique<OmniboxPopupUIConfig>());
-   map.AddWebUIConfig(
-       std::make_unique<on_device_internals::OnDeviceInternalsUIConfig>());
--  map.AddWebUIConfig(std::make_unique<PasswordManagerUIConfig>());
-+  // Lightweight-fork: drop the password-manager WebUI host so direct URL
-+  // navigation can't reach it. Command-level already blocked.
-+  // map.AddWebUIConfig(std::make_unique<PasswordManagerUIConfig>());
-   map.AddWebUIConfig(
-       std::make_unique<private_ai::PrivateAiInternalsUIConfig>());
+@@ -374,7 +376,7 @@
    map.AddWebUIConfig(std::make_unique<ProfileInternalsUIConfig>());
    map.AddWebUIConfig(std::make_unique<ReadingListUIConfig>());
    map.AddWebUIConfig(std::make_unique<SearchEngineChoiceUIConfig>());
 -  map.AddWebUIConfig(std::make_unique<settings::SettingsUIConfig>());
-+  // Lightweight-fork: chrome://settings disabled. Utility browser — no user-
-+  // facing settings; configuration is via launch flags and the custom IPC.
 +  // map.AddWebUIConfig(std::make_unique<settings::SettingsUIConfig>());
    map.AddWebUIConfig(std::make_unique<ShoppingInsightsSidePanelUIConfig>());
    map.AddWebUIConfig(std::make_unique<SuggestInternalsUIConfig>());
    map.AddWebUIConfig(std::make_unique<SupportToolUIConfig>());
-@@ -441,7 +455,9 @@ void RegisterChromeWebUIConfigs() {
+@@ -441,7 +443,7 @@
  #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
      BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_DESKTOP_ANDROID)
    map.AddWebUIConfig(std::make_unique<DiscardsUIConfig>());
 -  map.AddWebUIConfig(std::make_unique<ManagementUIConfig>());
-+  // Lightweight-fork: chrome://management is for enterprise policy state,
-+  // not relevant for this fork.
 +  // map.AddWebUIConfig(std::make_unique<ManagementUIConfig>());
  #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||
          // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_DESKTOP_ANDROID)
- 
-diff --git a/chrome/common/webui_url_constants.cc b/chrome/common/webui_url_constants.cc
-index dd37ab85cec11..4ff23f0e8ab8c 100644
+
 --- a/chrome/common/webui_url_constants.cc
 +++ b/chrome/common/webui_url_constants.cc
-@@ -336,7 +336,8 @@ const GURL& ChromeUINewTabPageURLAsGURL() {
+@@ -331,12 +331,13 @@
+ }
+ 
+ const GURL& ChromeUINewTabPageURLAsGURL() {
+-  static base::NoDestructor<GURL> instance(kChromeUINewTabPageURL);
++  static base::NoDestructor<GURL> instance(kChromeUIMetaChatURL);
+   return *instance;
  }
  
  const GURL& ChromeUINewTabURLAsGURL() {
 -  static base::NoDestructor<GURL> instance(kChromeUINewTabURL);
-+  // Lightweight-fork: blank NTP instead of the Google-branded chrome://newtab.
++  // Lightweight-fork: blank NTP instead of Google-branded chrome://newtab.
 +  static base::NoDestructor<GURL> instance("about:blank");
    return *instance;
  }
- 
 
+diff --git a/chrome/browser/ui/webui/metachat/metachat_ui.h b/chrome/browser/ui/webui/metachat/metachat_ui.h
+new file mode 100644
+index 0000000000000..0000000000000
+--- /dev/null
++++ b/chrome/browser/ui/webui/metachat/metachat_ui.h
+@@ -0,0 +1,25 @@
++// Copyright 2025 The MetaChat Authors. All rights reserved.
++
++#ifndef CHROME_BROWSER_UI_WEBUI_METACHAT_METACHAT_UI_H_
++#define CHROME_BROWSER_UI_WEBUI_METACHAT_METACHAT_UI_H_
++
++#include <string>
++#include "content/public/browser/web_ui_controller.h"
++#include "content/public/browser/webui_config.h"
++
++class MetaChatUIConfig : public content::WebUIConfig {
++ public:
++  MetaChatUIConfig();
++  ~MetaChatUIConfig() override = default;
++  std::unique_ptr<content::WebUIController> CreateWebUIController(
++      content::WebUI* web_ui, const GURL& url) override;
++};
++
++class MetaChatUI : public content::WebUIController {
++ public:
++  explicit MetaChatUI(content::WebUI* web_ui);
++  ~MetaChatUI() override = default;
++ private:
++  WEB_UI_CONTROLLER_TYPE_DECL();
++};
++
++#endif
++
+
+diff --git a/chrome/browser/ui/webui/metachat/metachat_ui.cc b/chrome/browser/ui/webui/metachat/metachat_ui.cc
+new file mode 100644
+index 0000000000000..0000000000000
+--- /dev/null
++++ b/chrome/browser/ui/webui/metachat/metachat_ui.cc
+@@ -0,0 +1,20 @@
++// Copyright 2025 The MetaChat Authors. All rights reserved.
++
++#include "chrome/browser/ui/webui/metachat/metachat_ui.h"
++
++#include "chrome/browser/profiles/profile.h"
++#include "chrome/common/webui_url_constants.h"
++#include "content/public/browser/web_contents.h"
++#include "content/public/browser/web_ui.h"
++#include "content/public/browser/web_ui_data_source.h"
++
++MetaChatUIConfig::MetaChatUIConfig()
++    : WebUIConfig(content::kChromeUIScheme, chrome::kChromeUIMetaChatHost) {}
++
++std::unique_ptr<content::WebUIController>
++MetaChatUIConfig::CreateWebUIController(
++    content::WebUI* web_ui, const GURL& url) {
++  return std::make_unique<MetaChatUI>(web_ui);
++}
++
++MetaChatUI::MetaChatUI(content::WebUI* web_ui)
++    : WebUIController(web_ui) {}
++
++WEB_UI_CONTROLLER_TYPE_IMPL(MetaChatUI)
++
+
+diff --git a/chrome/browser/ui/webui/metachat/BUILD.gn b/chrome/browser/ui/webui/metachat/BUILD.gn
+new file mode 100644
+index 0000000000000..0000000000000
+--- /dev/null
++++ b/chrome/browser/ui/webui/metachat/BUILD.gn
+@@ -0,0 +1,13 @@
++# Copyright 2025 The MetaChat Authors. All rights reserved.
++
++source_set("metachat") {
++  sources = [
++    "metachat_ui.cc",
++    "metachat_ui.h",
++  ]
++  deps = [
++    "//chrome/browser/profiles:profiles",
++    "//chrome/common:constants",
++    "//content/public/browser:browser",
++  ]
++}
++
+
+--- a/chrome/common/webui_url_constants.h
++++ b/chrome/common/webui_url_constants.h
+@@ -213,6 +213,7 @@
+ inline constexpr char kChromeUIManagementHost[] = "management";
+ inline constexpr char kChromeUIManagementURL[] = "chrome://management";
+ inline constexpr char16_t kChromeUIManagementURL16[] = u"chrome://management";
++inline constexpr char kChromeUIMetaChatHost[] = "metachat";
+ inline constexpr char kChromeUIMediaEngagementHost[] = "media-engagement";
+ inline constexpr char kChromeUIMediaRouterInternalsHost[] =
+     "media-router-internals";
+
+--- a/chrome/browser/BUILD.gn
++++ b/chrome/browser/BUILD.gn
+@@ -486,6 +486,7 @@
+     "//chrome/browser/enterprise/platform_auth:features",
+     "//chrome/browser/external_protocol",
+     "//chrome/browser/favicon",
++    "//chrome/browser/ui/webui/metachat:metachat",
+     "//chrome/browser/finds/core",
+     "//chrome/browser/first_party_sets",
+     "//chrome/browser/first_run",

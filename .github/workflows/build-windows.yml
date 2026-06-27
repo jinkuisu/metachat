@@ -85,7 +85,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "$env:SRC_DIR\build_overrides"
-          Set-Content -Path "$env:SRC_DIR\build_overrides\pdfium.gni" -Value "declare_args() { pdf_bundle_freetype_override = false }"
+          [System.IO.File]::WriteAllText("$env:SRC_DIR\build_overrides\pdfium.gni", "declare_args() { pdf_bundle_freetype_override = false }", [System.Text.UTF8Encoding]::new($false))
 
       - name: Download toolchains
         shell: pwsh
@@ -98,7 +98,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path out\Release_GN_x64
-          Set-Content -Path out\Release_GN_x64\args.gn -Value (
+          [System.IO.File]::WriteAllText("out\Release_GN_x64\args.gn", (
             "is_debug = false" + [char]10 +
             "is_component_build = false" + [char]10 +
             "symbol_level = 0" + [char]10 +
