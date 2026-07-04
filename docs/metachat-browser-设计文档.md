@@ -754,6 +754,85 @@ L1 已部分就绪（message_bus.cc 中有 DVLOG 调用），L2/L3 待实现。
 Seed 已支持通过 accounts.json 配置。当前从 profile 路径 hash 派生，后续可改读 accounts.json persona_seed 字段直接传参。
 
 详细指纹参数由 Fish 引擎从 seed 确定性派生。如有需要可加指纹模板系统（Phase 3）。
+
+
+### 11.11 指纹配置覆盖系统（待实现，和协议修复、日志埋点一起做）
+
+> 目标：用户可通过 accounts.json 的 persona_config 覆盖任意指纹参数，无需重新编译
+
+#### 机制
+
+在现有 `persona-seed.patch` 的基础增加一个 `--persona-config` 开关：
+
+- browser 进程：`AppendExtraCommandLineSwitches()` 读取 accounts.json 中的 persona_config 字段，序列化 JSON 字符串传给渲染进程
+- renderer 进程：`FingerprintProfile` 增加 `GetOverride(key)` 方法，解析 JSON 并返回覆盖值
+- 每个 Fish fingerprint hook：优先查 `persona_config`，有覆盖就用覆盖，没有则降级到 seed 确定性派生
+
+#### 改动手表
+
+| 文件 | 改动 |
+|------|------|
+| content/public/common/content_switches.h | 声明 kPersonaConfig 开关名 |
+| content/public/common/content_switches.cc | 定义 kPersonaConfig |
+| third_party/blink/public/common/fingerprinting/fingerprint_profile.h | 声明 GetOverride(key) |
+| third_party/blink/public/common/fingerprinting/fingerprint_profile.cc | 实现 JSON 解析 + GetOverride |
+| 各个 Fish fingerprint .cc（约 8-10 处） | 每个 hook 加一行：if (auto v = profile.GetOverride("key")) return v; |
+| ChromeContentBrowserClient::AppendExtraCommandLineSwitches() | 读取 accounts.json persona_config，传入 --persona-config |
+
+#### 用户配置格式
+
+```json
+{
+  "id": "wa_work",
+  "persona_seed": "abc123",
+  "persona_config": {
+    "navigator_platform": "Win32",
+    "navigator_hardware_concurrency": 8,
+    "device_memory": 8,
+    "screen_width": 1920,
+    "screen_height": 1080,
+    "screen_color_depth": 24,
+    "timezone": "Asia/Shanghai",
+    "locale": "zh-CN",
+    "canvas_noise": 0.3,
+    "webrtc_enabled": false,
+    "webgl_vendor": "Google Inc. (Intel)",
+    "webgl_renderer": "ANGLE (Intel, Intel(R) UHD Graphics Direct3D11 vs_5_0 ps_5_0)",
+    "audio_context_sample_rate": 48000
+  }
+}
+```
+
+不在 `persona_config` 中的字段自动降级到 seed 派生（Fish 原有行为）。新字段只需在 C++ 的 Fish hook 加一行读取，**无需改 config 解析逻辑**。
+
+### 11.12 日志埋点（和最终编译一起做）
+
+所有 C++ 改动点加一行日志调用，避免后续为加日志重新编译。
+
+#### 埋点清单
+
+| C++ 改动点 | 埋什么 | 级别 |
+|------------|--------|------|
+| message_bus.cc HandleDispatch | 每次 dispatch 的 channel/action/requestId | DEBG |
+| message_bus.cc HandleAccounts | 账号 CRUD 操作结果 | INFO |
+| message_bus.cc HandleWebs | WebContents 创建/切换/销毁 | INFO |
+| message_bus.cc HandleCdp | CDP 命令/结果/超时 | DEBG |
+| message_bus.cc HandleConfig | 配置变更 | INFO |
+| message_bus.cc HandleNotification | 推送通知事件 | DEBG |
+| persona-seed AppendExtraCommandLineSwitches | 种子注入结果 | INFO |
+| persona-config GetOverride | 每次参数覆盖查询 | TRACE |
+| metachat_ui.cc | WebUI 页面加载 | INFO |
+
+#### 实现方式
+
+```cpp
+// 在 message_bus.cc 每个 handler 的入口和出口
+METACHAT_VLOG(MESSAGE_BUS, 1) << "dispatch channel=" << channel << " action=" << action;
+METACHAT_VLOG(ACCOUNTS, 1) << "HandleAccounts action=" << action;
+METACHAT_VLOG(CDP, 2) << "HandleCdp action=" << action << " account=" << account_id;
+```
+
+日志级别通过 `config` 通道运行时控制（`config.set_log_level`）。
 ## 附录 A：branding-icons.patch — 品牌图标替换指南
 
 ### A.1 当前状态
