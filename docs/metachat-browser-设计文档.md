@@ -739,6 +739,21 @@ L1 已部分就绪（message_bus.cc 中有 DVLOG 调用），L2/L3 待实现。
 - AI 集成场景说明
 - C++ 接口定义
 - 实现计划（6 步，~210 行 C++）
+
+### 11.9 消息总线协议改进（待改，和 L2 日志一起做）
+
+两个改动点，协议冻结前必须改掉：
+
+1. error 移到顶层：当前 payload.error → 顶层 {error: {code, message}}，JS 端统一检查 msg.error
+2. 响应回传 traceId：当前响应无 traceId → 响应加 traceId 字段，保证追踪链完整
+
+改动范围：message_bus.cc MakeResponse()/SendResponse()/SendEvent() 及 JS 端 onMessage
+
+### 11.10 指纹配置（无需改源码）
+
+Seed 已支持通过 accounts.json 配置。当前从 profile 路径 hash 派生，后续可改读 accounts.json persona_seed 字段直接传参。
+
+详细指纹参数由 Fish 引擎从 seed 确定性派生。如有需要可加指纹模板系统（Phase 3）。
 ## 附录 A：branding-icons.patch — 品牌图标替换指南
 
 ### A.1 当前状态
