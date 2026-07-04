@@ -713,6 +713,32 @@ C++ 引擎层一旦写好不再改动，所有后续功能在 WebUI 层实现。
 
 ---
 
+
+## 十一、事件日志系统（待实现）
+
+> 优先级：P1（Phase 1 MVP 完成后再做）
+> 依赖：消息总线就绪、账号管理就绪、CDP 桥就绪
+
+### 11.1 三层日志体系
+
+| 层 | 名称 | 用途 | 持久化 | 机制 |
+|----|------|------|--------|------|
+| L1 | 调试日志 | 开发调试、运行流 | --log-file 文本文件 | Chromium VLOG，启动时控制 |
+| L2 | 审计事件 | 用户操作追踪、AI 故障分析 | JSONL 文件 | 自定义 MetaChatEventStore |
+| L3 | 业务数据 | 消息/联系人导出、统计分析 | JSONL 文件 | 自定义 MetaChatDataStore |
+
+L1 已部分就绪（message_bus.cc 中有 DVLOG 调用），L2/L3 待实现。
+
+### 11.2 事件格式
+
+全文详见设计文档的十一节，包含：
+- 事件字段定义（ts, event, traceId, spanId, user, channel, account, platform, elapsed, data, error, meta）
+- 5 大类事件清单（用户操作 / CDP / 指纹 / 网络 / 系统）
+- 文件结构（events/ 按天切割，data/ 按账号分割）
+- 运行时控制（config 通道动态调整级别）
+- AI 集成场景说明
+- C++ 接口定义
+- 实现计划（6 步，~210 行 C++）
 ## 附录 A：branding-icons.patch — 品牌图标替换指南
 
 ### A.1 当前状态
