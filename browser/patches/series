@@ -17,5 +17,6 @@ webrtc-leak-shield.patch
 tls-fingerprint.patch
 humanized-input.patch
 chrome-ui.patch
+metachat-message-bus.patch
 search-engines.patch
 ai-agent-layer.patch

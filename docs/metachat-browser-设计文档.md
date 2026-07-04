@@ -344,17 +344,17 @@ WebUI 与 C++ 之间不通过多个零散的 chrome.send() 调用，而是统一
 `
 WebUI (MessageBus.js)
   │
-  │ chrome.send('message', [{ channel, action, payload, meta }])
+  │ chrome.send('metachat.dispatch', [channel, action, payload, requestId, meta])
   ▼
-C++ (MetaChatMessageHandler::HandleMessage)
+C++ (MetaChatMessageBus::HandleDispatch)
   │
   │ 根据 channel 路由到对应 Handler
   ▼
 AccountsHandler / WebContentsHandler / CdpBridge / ConfigHandler
   │
-  │ CallJavascriptFunction('MessageBus.onEvent', { channel, event, payload, meta })
+  │ CallJavascriptFunction('__metachat.onMessage', { channel, event, payload, meta })
   ▼
-WebUI (MessageBus.onEvent)
+WebUI (__metachat.onMessage)
 `
 
 ### 5.2 消息格式
@@ -365,10 +365,11 @@ interface MessageRequest {
     channel: string;          // 路由通道
     action: string;           // 操作名
     payload?: any;            // 参数
-    requestId?: string;       // 请求 ID（自动生成，用于匹配响应）
+    requestId: string;       // 请求 ID（自动生成，用于匹配响应）
     meta?: {
         timestamp: number;         // 发送时间
-        source: string;            // 来源标识
+        source?: string;           // 来源标识（可选）
+        traceId?: string;          // 追踪链 ID
         sessionId?: string;        // 会话 ID（可选）
         debug?: boolean;           // 调试日志开关
         note?: string;             // 备注说明
@@ -380,8 +381,7 @@ interface MessageResponse {
     channel: string;
     action: string;
     payload?: any;
-    requestId: string;
-    success: boolean;
+    requestId: string;
     error?: string;
     meta?: {
         timestamp: number;
@@ -412,9 +412,10 @@ interface MessageEvent {
 | channel | 方向 | 说明 | 主要 actions |
 |---------|------|------|-------------|
 | ccounts | 双向 | 账号管理 | list create emove update switch |
-| webs | 双向 | WebContents 管理 | create switch destroy set-visibility |
+| webs | 双向 | WebContents 管理 | create switch destroy set-visibility notify |
 | ingerprint | 双向 | 指纹管理 | set-seed get-profile |
 | cdp | 双向 | CDP 代理 | evaluate subscribe unsubscribe call-function |
+| notification | 单向(C++→JS) | 推送通知 | (event only) |
 | config | 双向 | 配置存储 | save load delete |
 | system | 双向 | 系统操作 | get-info open-url quit |
 
@@ -496,12 +497,12 @@ class MessageBus {
 window.MessageBus = new MessageBus();
 `
 
-### 5.5 C++ 端（MetaChatMessageHandler）
+### 5.5 C++ 端（MetaChatMessageBus）
 
 `cpp
-// chrome/browser/metachat/metachat_message_handler.h
+// chrome/browser/ui/webui/metachat/message_bus.h
 
-class MetaChatMessageHandler : public content::WebUIMessageHandler {
+class MetaChatMessageBus : public content::WebUIMessageHandler {
  public:
   void RegisterMessages() override;
   void DispatchEvent(const std::string& channel,
@@ -509,7 +510,7 @@ class MetaChatMessageHandler : public content::WebUIMessageHandler {
                      base::Value payload,
                      base::Value::Dict meta = {});
  private:
-  void HandleMessage(const base::Value::List& args);
+  void HandleDispatch(const base::Value::List& args);
   std::unique_ptr<AccountsHandler> accounts_handler_;
   std::unique_ptr<WebContentsHandler> web_contents_handler_;
   std::unique_ptr<CdpBridge> cdp_bridge_;
@@ -519,7 +520,7 @@ class MetaChatMessageHandler : public content::WebUIMessageHandler {
 
 `cpp
 // 路由逻辑
-void MetaChatMessageHandler::HandleMessage(const base::Value::List& args) {
+void MetaChatMessageBus::HandleDispatch(const base::Value::List& args) {
     const auto& msg = args[0].GetDict();
     const std::string& channel = *msg.FindString("channel");
     const std::string& action = *msg.FindString("action");

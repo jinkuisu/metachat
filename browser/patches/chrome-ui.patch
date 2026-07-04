@@ -762,22 +762,13 @@ index 0000000000000..0000000000000
 
 --- a/chrome/common/webui_url_constants.h
 +++ b/chrome/common/webui_url_constants.h
-@@ -213,6 +213,7 @@
+@@ -213,6 +213,9 @@
  inline constexpr char kChromeUIManagementHost[] = "management";
  inline constexpr char kChromeUIManagementURL[] = "chrome://management";
  inline constexpr char16_t kChromeUIManagementURL16[] = u"chrome://management";
 +inline constexpr char kChromeUIMetaChatHost[] = "metachat";
++inline constexpr char kChromeUIMetaChatURL[] = "chrome://metachat/";
++inline constexpr char16_t kChromeUIMetaChatURL16[] = u"chrome://metachat/";
  inline constexpr char kChromeUIMediaEngagementHost[] = "media-engagement";
  inline constexpr char kChromeUIMediaRouterInternalsHost[] =
      "media-router-internals";
-
---- a/chrome/browser/BUILD.gn
-+++ b/chrome/browser/BUILD.gn
-@@ -486,6 +486,7 @@
-     "//chrome/browser/enterprise/platform_auth:features",
-     "//chrome/browser/external_protocol",
-     "//chrome/browser/favicon",
-+    "//chrome/browser/ui/webui/metachat:metachat",
-     "//chrome/browser/finds/core",
-     "//chrome/browser/first_party_sets",
-     "//chrome/browser/first_run",
