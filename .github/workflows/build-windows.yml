@@ -47,33 +47,26 @@ jobs:
           git checkout $env:CHROMIUM_COMMIT
           gclient sync --with_branch_heads --with_tags --nohooks -D
 
-      - name: Apply patches
+      - name: Apply metachat-all.patch
         shell: pwsh
         run: |
           $metachat = "$env:GITHUB_WORKSPACE\metachat"
-          $patchRoot = "$metachat\browser\patches"
-          $seriesFile = "$patchRoot\series"
-          if (Test-Path $seriesFile) {
-            cd $env:SRC_DIR
-            Get-Content $seriesFile | ForEach-Object {
-              $patch = $_.Trim()
-              if ($patch -and $patch -notmatch "^#") {
-                $patchFile = "$patchRoot\$patch"
-                if (Test-Path $patchFile) {
-                  Write-Host "Patch: $patch"
-                  git apply --reject --whitespace=fix $patchFile 2>&1
-                }
-              }
-            }
+          cd $env:SRC_DIR
+          $patchFile = "$metachat\browser\patches\metachat-all.patch"
+          if (Test-Path $patchFile) {
+            Write-Host "Applying metachat-all.patch..."
+            git apply --reject --whitespace=fix $patchFile 2>&1
             $rejCount = (Get-ChildItem -Recurse -Filter "*.rej" -Name).Count
             if ($rejCount -gt 0) {
-              Write-Host "PATCHES FAILED: $rejCount reject files" -ForegroundColor Red
+              Write-Host "PATCH FAILED: $rejCount reject files" -ForegroundColor Red
               Get-ChildItem -Recurse -Filter "*.rej" | Select-Object -ExpandProperty FullName
               exit 1
             }
-            Write-Host "All patches applied OK" -ForegroundColor Green
+            Write-Host "Patch applied OK" -ForegroundColor Green
+          } else {
+            Write-Host "ERROR: metachat-all.patch not found" -ForegroundColor Red
+            exit 1
           }
-
       - name: Overlay assets
         shell: pwsh
         run: |
