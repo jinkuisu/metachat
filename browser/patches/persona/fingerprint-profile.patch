@@ -492,6 +492,10 @@ index 0000000000000..6b7084d558386
 +      }
 +    }
 +    profile = new FingerprintProfile(DeriveFromSeed(seed));
++  // MetaChat: DVLOG - 记录指纹面具初始化
++  DVLOG(1) << "MetaChat: fingerprint profile initialized, seed=" << seed
++           << " persona-os="
++           << (cmd ? cmd->GetSwitchValueASCII("persona-os") : "(null)");
 +  });
 +  return *profile;
 +}

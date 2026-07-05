@@ -56,7 +56,7 @@ index 2e1c77eaaca9a..17493057ca21e 100644
        switches::kEnableExperimentalAccessibilityLanguageDetection,
        switches::kEnableExperimentalAccessibilityLabelsDebugging,
        switches::kEnableExperimentalWebPlatformFeatures,
-@@ -3980,6 +3984,12 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
+@@ -3980,6 +3984,17 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
  #if BUILDFLAG(IS_CHROMEOS)
        switches::kSchedulerBoostUrgent,
  #endif
@@ -67,6 +67,12 @@ index 2e1c77eaaca9a..17493057ca21e 100644
 +      "persona-os",
    };
    renderer_cmd->CopySwitchesFrom(browser_cmd, kSwitchNames);
+
++  // MetaChat: DVLOG - 记录已转发的指纹种子
++  DVLOG(1) << "MetaChat: persona-seed="
++           << browser_cmd->GetSwitchValueASCII(switches::kPersonaSeed)
++           << " persona-os="
++           << browser_cmd->GetSwitchValueASCII("persona-os");
 
 diff --git a/content/public/common/content_switches.cc b/content/public/common/content_switches.cc
 index a5dd79908643a..7a454d86f251c 100644

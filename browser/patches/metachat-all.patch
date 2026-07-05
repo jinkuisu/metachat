@@ -80,7 +80,6 @@ index f8363d5b294fe..75be9536318be 100644
  MAC_BUNDLE_ID=org.chromium.Chromium
  MAC_CREATOR_CODE=Cr24
 
-
 # =============================================================================
 # Persona-Seed: 指纹种子注入 - 将指纹种子传递给渲染进程
 # =============================================================================
@@ -139,7 +138,7 @@ index 2e1c77eaaca9a..17493057ca21e 100644
        switches::kEnableExperimentalAccessibilityLanguageDetection,
        switches::kEnableExperimentalAccessibilityLabelsDebugging,
        switches::kEnableExperimentalWebPlatformFeatures,
-@@ -3980,6 +3984,12 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
+@@ -3980,6 +3984,17 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
  #if BUILDFLAG(IS_CHROMEOS)
        switches::kSchedulerBoostUrgent,
  #endif
@@ -150,6 +149,12 @@ index 2e1c77eaaca9a..17493057ca21e 100644
 +      "persona-os",
    };
    renderer_cmd->CopySwitchesFrom(browser_cmd, kSwitchNames);
+
++  // MetaChat: DVLOG - 记录已转发的指纹种子
++  DVLOG(1) << "MetaChat: persona-seed="
++           << browser_cmd->GetSwitchValueASCII(switches::kPersonaSeed)
++           << " persona-os="
++           << browser_cmd->GetSwitchValueASCII("persona-os");
 
 diff --git a/content/public/common/content_switches.cc b/content/public/common/content_switches.cc
 index a5dd79908643a..7a454d86f251c 100644
@@ -182,7 +187,6 @@ index 17e834a0e19e6..7a946e6543366 100644
  CONTENT_EXPORT extern const char kEnableBlinkFeatures[];
  CONTENT_EXPORT extern const char kEnableCaretBrowsing[];
  CONTENT_EXPORT extern const char kEnableDisplayList2dCanvas[];
-
 # =============================================================================
 # Fingerprint-Profile: 指纹引擎核心 - 确定性指纹面具生成
 # =============================================================================
@@ -677,6 +681,10 @@ index 0000000000000..6b7084d558386
 +      }
 +    }
 +    profile = new FingerprintProfile(DeriveFromSeed(seed));
++  // MetaChat: DVLOG - 记录指纹面具初始化
++  DVLOG(1) << "MetaChat: fingerprint profile initialized, seed=" << seed
++           << " persona-os="
++           << (cmd ? cmd->GetSwitchValueASCII("persona-os") : "(null)");
 +  });
 +  return *profile;
 +}
@@ -817,7 +825,6 @@ index 0000000000000..9c6078b9d6db4
 +}  // namespace blink::fingerprinting
 +
 +#endif  // THIRD_PARTY_BLINK_PUBLIC_COMMON_FINGERPRINTING_FINGERPRINT_PROFILE_H_
-
 # =============================================================================
 # Disable-Intrusive-APIs: 禁用隐私侵入性 API
 # =============================================================================
@@ -956,7 +963,6 @@ index 594cd59a601c2..3ad9dd4c20499 100644
  
  const char kSkipTouchEventFilterTypeParamName[] = "type";
  const char kSkipTouchEventFilterTypeParamValueDiscrete[] = "discrete";
-
 # =============================================================================
 # navigator: Navigator 指纹修改
 # =============================================================================
@@ -1783,7 +1789,6 @@ index 368d39278163d..a6882cd5f1719 100644
      },
      {
        name: "NetInfoDownlinkMax",
-
 # =============================================================================
 # display: 屏幕显示指纹修改
 # =============================================================================
@@ -2169,7 +2174,6 @@ index 490cda360093f..2da2b3b011855 100644
  }
  
  bool ScreenDetailed::isPrimary() const {
-
 # =============================================================================
 # device-sensors: 设备传感器指纹
 # =============================================================================
@@ -2826,7 +2830,6 @@ index 9d155705c1350..57c0f90549119 100644
  }
  
  const String& GPUAdapterInfo::device() const {
-
 # =============================================================================
 # timing-misc: 时间精度/杂项指纹
 # =============================================================================
@@ -2920,7 +2923,6 @@ index 769a70e416c7e..127ced84c0b1e 100644
    constexpr auto kCoarseResolution = base::Microseconds(100);
    // Add this assert, in case TimeClamper's resolution were to change to be
    // stricter.
-
 # =============================================================================
 # Lean-Windows-Fonts: 精简 Windows 字体文件
 # =============================================================================
@@ -2953,7 +2955,6 @@ index 769a70e416c7e..127ced84c0b1e 100644
 # - 字体文件必须在 GHA 编译前下载到指定目录
 # - 如果字体文件缺失，编译不会报错但字体伪装会失效
 # =============================================================================
-
 # =============================================================================
 # font-substitution: 字体替换伪装
 # =============================================================================
@@ -3485,7 +3486,6 @@ index ec06f7decbacf..c962cd6dfa3f9 100644
      substitute_font.reset(
          CTFontCreateForString(font_to_substitute.get(), string.get(), range));
    } else {
-
 # =============================================================================
 # component: Canvas 桥接组件
 # =============================================================================
@@ -5782,7 +5782,6 @@ index 0000000000000..79e74cd3e5cef
 +}  // namespace blink::canvas_bridge
 +
 +#endif  // THIRD_PARTY_BLINK_RENDERER_PLATFORM_CANVAS_BRIDGE_CANVAS_BRIDGE_CODEC_H_
-
 # =============================================================================
 # canvas2d: Canvas 2D 指纹
 # =============================================================================
@@ -6530,7 +6529,6 @@ index 117bddcc7b266..f5446078bd706 100644
    void closePath();
    void moveTo(double double_x, double double_y);
    void lineTo(double double_x, double double_y);
-
 # =============================================================================
 # webgl: WebGL 指纹
 # =============================================================================
@@ -7262,7 +7260,6 @@ index aaee965c67969..ad5a589cf1579 100644
    bool IsPaintable() const final { return GetDrawingBuffer(); }
  
    void HoldReferenceToDrawingBuffer(DrawingBuffer*);
-
 # =============================================================================
 # webaudio: WebAudio 指纹
 # =============================================================================
@@ -7614,7 +7611,6 @@ index c02c792af301a..189fa86eb37dd 100644
      }
  
      frames_processed_ += frames_available_to_copy;
-
 # =============================================================================
 # webrtc-leak-shield: WebRTC 泄露防护
 # =============================================================================
@@ -7885,7 +7881,6 @@ index 1d85fe3c79b61..6cd79827cd003 100644
    RTCIceCandidate* ice_candidate = RTCIceCandidate::Create(platform_candidate);
    MaybeDispatchEvent(RTCPeerConnectionIceEvent::Create(ice_candidate));
  }
-
 # =============================================================================
 # tls-fingerprint: TLS 指纹伪装
 # =============================================================================
@@ -7955,7 +7950,6 @@ index 307f596f3e017..718b2cfa5fd58 100644
  
    // The compliance policy must be the last thing configured in order to have
    // defined behavior.
-
 # =============================================================================
 # humanized-input: 人性化输入模拟
 # =============================================================================
@@ -8992,7 +8986,6 @@ index 6015a94554c21..49e950d3f8f98 100644
 +      # JSON array of the resolved/executed steps, each tagged
 +      # recorded|replayed|healed. Persist this as the flow's plan for replay.
 +      string stepsJson
-
 # =============================================================================
 # chrome-ui: Chrome UI 隐藏
 # =============================================================================
@@ -9653,7 +9646,6 @@ index dd37ab85cec11..4ff23f0e8ab8c 100644
    return *instance;
  }
  
-
 # =============================================================================
 # search-engines: 搜索引擎管理
 # =============================================================================
@@ -9716,7 +9708,6 @@ index 4ad0bb0eb1c07..fe23ba9e49053 100644
  };
  
  int GetDataVersion() {
-
 # =============================================================================
 # agent-layer: AI Agent 层
 # =============================================================================
@@ -12567,7 +12558,6 @@ index 01caa48d282c0..041ac53bf435f 100644
  #if BUILDFLAG(IS_ANDROID)
    // Allow delegate to override how to take a snapshot of this WebContents into
    // a HardwareBuffer. Return true if the delegate will execute callback with a
-
 # =============================================================================
 # MetaChat Message-Bus: 消息总线 - 账号管理与跨进程通信
 # =============================================================================
