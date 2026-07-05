@@ -2961,9 +2961,9 @@ index 769a70e416c7e..127ced84c0b1e 100644
 # - Tinos-*.ttf (4 个文件, 替代 Times New Roman)
 #
 # 下载方式（GHA 步骤）：
-# - 源：ChromiumFish repo (commit a64c8adb6a)
+# - 源：ChromiumFish repo (tag v149.0.7827.115)
 # - URL 模板：https://raw.githubusercontent.com/arman-bd/chromiumfish/
-#   a64c8adb6a/third_party/lean_windows_fonts/{filename}
+#   v149.0.7827.115/assets/third_party/lean_windows_fonts/{filename}
 # - 目标：src/third_party/lean_windows_fonts/
 #
 # 依赖关系：

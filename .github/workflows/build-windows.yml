@@ -83,6 +83,7 @@ jobs:
           if (Test-Path $patchFile) {
             Write-Host "Applying metachat-all.patch..."
             git apply --reject --binary --whitespace=fix $patchFile 2>&1
+            if (-not $?) { exit 1 }
             $rejCount = (Get-ChildItem -Recurse -Filter "*.rej" -Name).Count
             if ($rejCount -gt 0) {
               Write-Host "PATCH FAILED: $rejCount reject files" -ForegroundColor Red
