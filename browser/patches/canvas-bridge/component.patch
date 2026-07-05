@@ -412,6 +412,8 @@ index 0000000000000..a8b283e2dcdeb
 +
 +CanvasBridgeClient::CanvasBridgeClient() {
 +  StartUp();
++  // MetaChat: DVLOG - 记录 CanvasBridgeClient 创建
++  DVLOG(1) << "MetaChat: CanvasBridgeClient created";
 +}
 +
 +CanvasBridgeClient::~CanvasBridgeClient() = default;
@@ -431,6 +433,9 @@ index 0000000000000..a8b283e2dcdeb
 +  // variants, etc.). Without this the server was getting persona_seed=0
 +  // for every session, making all fork instances render identically.
 +  persona_seed_ = fingerprinting::Current().persona_seed;
++  // MetaChat: DVLOG - 记录 CanvasBridge 启动参数
++  DVLOG(1) << "MetaChat: canvas bridge startup, persona_seed=" << persona_seed_
++           << " url=" << url_;
 +  io_thread_ = std::make_unique<base::Thread>("canvas-bridge-io");
 +  base::Thread::Options opts;
 +  opts.message_pump_type = base::MessagePumpType::IO;

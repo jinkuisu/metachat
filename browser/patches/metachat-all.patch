@@ -1051,6 +1051,9 @@ index 608bea5cb3864..cd3a44bc25f95 100644
 +  // build (e.g. 150) while the User-Agent string claims the persona
 +  // (e.g. 148), an immediate consistency-mismatch fingerprint tell.
 +  const auto& p = blink::fingerprinting::Current();
++  // MetaChat: DVLOG - 记录 User-Agent 伪装值
++  DVLOG(1) << "MetaChat: navigator fingerprint: chrome_major=" << p.chrome_major_version
++           << " chrome_full=" << p.chrome_full_version;
 +  return GetUserAgentBrandList(base::NumberToString(p.chrome_major_version),
 +                               p.chrome_full_version,
                                 blink::UserAgentBrandVersionType::kMajorVersion,
@@ -1064,6 +1067,9 @@ index 608bea5cb3864..cd3a44bc25f95 100644
 -                               std::string(version_info::GetVersionNumber()),
 +  // Same persona-version source as the major-version variant above.
 +  const auto& p = blink::fingerprinting::Current();
++  // MetaChat: DVLOG - 记录 User-Agent 伪装值
++  DVLOG(1) << "MetaChat: navigator fingerprint: chrome_major=" << p.chrome_major_version
++           << " chrome_full=" << p.chrome_full_version;
 +  return GetUserAgentBrandList(base::NumberToString(p.chrome_major_version),
 +                               p.chrome_full_version,
                                 blink::UserAgentBrandVersionType::kFullVersion,
@@ -1824,6 +1830,8 @@ index 0d60244742506..4dfc4636dad74 100644
 +  // Bot detectors (a fingerprinting test page, the fingerprinter) cross-check: UA=desktop + pointer=none =>
 +  // headless/automated. Override at the MediaValues layer so all four
 +  // (any-pointer, pointer, any-hover, hover) match real Win Chrome.
++  // MetaChat: DVLOG - 显示指纹覆盖已激活
++  DVLOG(1) << "MetaChat: display fingerprint active, pointer=Fine";
 +  return mojom::blink::PointerType::kPointerFineType;
  }
  
@@ -3900,6 +3908,8 @@ index 0000000000000..a8b283e2dcdeb
 +
 +CanvasBridgeClient::CanvasBridgeClient() {
 +  StartUp();
++  // MetaChat: DVLOG - 记录 CanvasBridgeClient 创建
++  DVLOG(1) << "MetaChat: CanvasBridgeClient created";
 +}
 +
 +CanvasBridgeClient::~CanvasBridgeClient() = default;
@@ -3919,6 +3929,9 @@ index 0000000000000..a8b283e2dcdeb
 +  // variants, etc.). Without this the server was getting persona_seed=0
 +  // for every session, making all fork instances render identically.
 +  persona_seed_ = fingerprinting::Current().persona_seed;
++  // MetaChat: DVLOG - 记录 CanvasBridge 启动参数
++  DVLOG(1) << "MetaChat: canvas bridge startup, persona_seed=" << persona_seed_
++           << " url=" << url_;
 +  io_thread_ = std::make_unique<base::Thread>("canvas-bridge-io");
 +  base::Thread::Options opts;
 +  opts.message_pump_type = base::MessagePumpType::IO;
@@ -7317,6 +7330,10 @@ index e60e454815d33..dea9295f2fe06 100644
    DCHECK(destination());
  
 -  return base_latency_;
++  // MetaChat: DVLOG - 记录音频指纹参数
++  DVLOG(1) << "MetaChat: audio fingerprint: sample_rate="
++           << fingerprinting::Current().audio_sample_rate
++           << " base_latency=" << fingerprinting::Current().audio_base_latency;
 +  return fingerprinting::Current().audio_base_latency;
  }
  
@@ -7328,6 +7345,8 @@ index e60e454815d33..dea9295f2fe06 100644
 -
 -  double factor = GetOutputLatencyQuantizingFactor();
 -  return std::round(output_position_.hardware_output_latency / factor) * factor;
++  DVLOG(2) << "MetaChat: audio fingerprint: output_latency="
++           << fingerprinting::Current().audio_output_latency;
 +  return fingerprinting::Current().audio_output_latency;
  }
  
@@ -7790,6 +7809,8 @@ index 14232136193ff..491c85a56a9cc 100644
 +      }
 +    }
 +#endif  // BUILDFLAG(IS_LINUX)
++  // MetaChat: DVLOG - 隐私保护已激活
++  DVLOG(1) << "MetaChat: webrtc/shield initialized (password-store, WebRTC, WebGL/SwiftShader, WebGPU, timezone, Ozone)";
 +  }
 +
    const base::CommandLine& command_line =
@@ -9216,6 +9237,8 @@ index ed69c678e9a8d..d206338d33205 100644
  bool BrowserCommandController::ExecuteCommand(int id,
                                                base::TimeTicks time_stamp) {
 +  if (IsLightweightForkBlockedCommand(id)) {
++    // MetaChat: DVLOG - 记录被拦截的命令
++    DVLOG(1) << "MetaChat: blocked command ID=" << id;
 +    return false;
 +  }
    return ExecuteCommandWithDisposition(id, WindowOpenDisposition::CURRENT_TAB,
@@ -9226,6 +9249,8 @@ index ed69c678e9a8d..d206338d33205 100644
      WindowOpenDisposition disposition,
      base::TimeTicks time_stamp) {
 +  if (IsLightweightForkBlockedCommand(id)) {
++    // MetaChat: DVLOG - 记录被拦截的命令
++    DVLOG(1) << "MetaChat: blocked command ID=" << id;
 +    return false;
 +  }
    // Doesn't go through the command_updater_ to avoid dealing with having a

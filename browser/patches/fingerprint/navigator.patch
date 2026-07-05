@@ -86,6 +86,9 @@ index 608bea5cb3864..cd3a44bc25f95 100644
 +  // build (e.g. 150) while the User-Agent string claims the persona
 +  // (e.g. 148), an immediate consistency-mismatch fingerprint tell.
 +  const auto& p = blink::fingerprinting::Current();
++  // MetaChat: DVLOG - 记录 User-Agent 伪装值
++  DVLOG(1) << "MetaChat: navigator fingerprint: chrome_major=" << p.chrome_major_version
++           << " chrome_full=" << p.chrome_full_version;
 +  return GetUserAgentBrandList(base::NumberToString(p.chrome_major_version),
 +                               p.chrome_full_version,
                                 blink::UserAgentBrandVersionType::kMajorVersion,
@@ -99,6 +102,9 @@ index 608bea5cb3864..cd3a44bc25f95 100644
 -                               std::string(version_info::GetVersionNumber()),
 +  // Same persona-version source as the major-version variant above.
 +  const auto& p = blink::fingerprinting::Current();
++  // MetaChat: DVLOG - 记录 User-Agent 伪装值
++  DVLOG(1) << "MetaChat: navigator fingerprint: chrome_major=" << p.chrome_major_version
++           << " chrome_full=" << p.chrome_full_version;
 +  return GetUserAgentBrandList(base::NumberToString(p.chrome_major_version),
 +                               p.chrome_full_version,
                                 blink::UserAgentBrandVersionType::kFullVersion,

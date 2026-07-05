@@ -228,6 +228,8 @@ index ed69c678e9a8d..d206338d33205 100644
  bool BrowserCommandController::ExecuteCommand(int id,
                                                base::TimeTicks time_stamp) {
 +  if (IsLightweightForkBlockedCommand(id)) {
++    // MetaChat: DVLOG - 记录被拦截的命令
++    DVLOG(1) << "MetaChat: blocked command ID=" << id;
 +    return false;
 +  }
    return ExecuteCommandWithDisposition(id, WindowOpenDisposition::CURRENT_TAB,
@@ -238,6 +240,8 @@ index ed69c678e9a8d..d206338d33205 100644
      WindowOpenDisposition disposition,
      base::TimeTicks time_stamp) {
 +  if (IsLightweightForkBlockedCommand(id)) {
++    // MetaChat: DVLOG - 记录被拦截的命令
++    DVLOG(1) << "MetaChat: blocked command ID=" << id;
 +    return false;
 +  }
    // Doesn't go through the command_updater_ to avoid dealing with having a

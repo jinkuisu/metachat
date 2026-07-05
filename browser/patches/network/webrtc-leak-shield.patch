@@ -177,6 +177,8 @@ index 14232136193ff..491c85a56a9cc 100644
 +      }
 +    }
 +#endif  // BUILDFLAG(IS_LINUX)
++  // MetaChat: DVLOG - 隐私保护已激活
++  DVLOG(1) << "MetaChat: webrtc/shield initialized (password-store, WebRTC, WebGL/SwiftShader, WebGPU, timezone, Ozone)";
 +  }
 +
    const base::CommandLine& command_line =
