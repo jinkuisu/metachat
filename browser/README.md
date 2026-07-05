@@ -1,4 +1,4 @@
-﻿# MetaChat Browser
+# MetaChat Browser
 
 MetaChat Browser 是基于 Chromium 150.0.7844.0 + ChromiumFish 21 个反指纹补丁的独立浏览器。
 

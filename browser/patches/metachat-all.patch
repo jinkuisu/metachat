@@ -61,7 +61,8 @@ index cb212bf396c79..94c1718e9ab11 100644
            </message>
          </else>
        </if>
-\ndiff --git a/chrome/app/theme/chromium/BRANDING b/chrome/app/theme/chromium/BRANDING
+
+diff --git a/chrome/app/theme/chromium/BRANDING b/chrome/app/theme/chromium/BRANDING
 index f8363d5b294fe..75be9536318be 100644
 --- a/chrome/app/theme/chromium/BRANDING
 +++ b/chrome/app/theme/chromium/BRANDING
