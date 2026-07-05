@@ -169,12 +169,14 @@ index 0000000000000..a8b283e2dcdeb
 +
 +#include "third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.h"
 +
++#if BUILDFLAG(IS_POSIX)
 +#include <fcntl.h>
 +#include <netdb.h>
 +#include <netinet/in.h>
 +#include <netinet/tcp.h>
 +#include <sys/socket.h>
 +#include <unistd.h>
++#endif  // BUILDFLAG(IS_POSIX)
 +
 +#include <cstring>
 +
@@ -245,6 +247,7 @@ index 0000000000000..a8b283e2dcdeb
 +  return !host->empty() && *port > 0 && *port < 65536;
 +}
 +
++#if BUILDFLAG(IS_POSIX)
 +// Resolve + TCP connect. Returns fd on success, -1 on failure.
 +int TcpConnect(const std::string& host, int port) {
 +  struct addrinfo hints {};
@@ -403,6 +406,7 @@ index 0000000000000..a8b283e2dcdeb
 +  return true;
 +}
 +
++#endif  // BUILDFLAG(IS_POSIX)
 +}  // namespace
 +
 +CanvasBridgeClient* CanvasBridgeClient::Get() {
@@ -468,6 +472,7 @@ index 0000000000000..a8b283e2dcdeb
 +    LOG(WARNING) << "[canvas-bridge] bad URL: " << url;
 +    return false;
 +  }
++#if BUILDFLAG(IS_POSIX)
 +  int fd = TcpConnect(host, port);
 +  if (fd < 0) {
 +    LOG(WARNING) << "[canvas-bridge] TCP connect to " << host << ":" << port
@@ -539,6 +544,11 @@ index 0000000000000..a8b283e2dcdeb
 +              << " proto=" << welcome->protocol_version;
 +  }
 +  return true;
++#else
++  LOG(WARNING) << "[canvas-bridge] TCP connect not supported on this platform";
++  Disable("canvas-bridge requires POSIX sockets");
++  return false;
++#endif
 +}
 +
 +void CanvasBridgeClient::SendOnIoThread(std::vector<uint8_t> frame) {
@@ -546,6 +556,7 @@ index 0000000000000..a8b283e2dcdeb
 +  // thread is blocked in ReadLoop. write_lock_ serializes concurrent
 +  // writers.
 +  base::AutoLock lock(write_lock_);
++#if BUILDFLAG(IS_POSIX)
 +  int fd = socket_fd_;
 +  if (fd < 0) return;
 +  if (!WriteWsBinaryFrame(fd, frame.data(), frame.size())) {
@@ -554,9 +565,11 @@ index 0000000000000..a8b283e2dcdeb
 +    close(fd);
 +    socket_fd_ = -1;
 +  }
++#endif  // BUILDFLAG(IS_POSIX)
 +}
 +
 +void CanvasBridgeClient::ReadLoop() {
++#if BUILDFLAG(IS_POSIX)
 +  while (state_.load() == State::kReady && socket_fd_ >= 0) {
 +    std::vector<uint8_t> payload;
 +    uint8_t opcode = 0;
@@ -579,6 +592,7 @@ index 0000000000000..a8b283e2dcdeb
 +    }
 +    HandleIncoming(payload);
 +  }
++#endif  // BUILDFLAG(IS_POSIX)
 +}
 +
 +void CanvasBridgeClient::HandleIncoming(const std::vector<uint8_t>& frame) {
