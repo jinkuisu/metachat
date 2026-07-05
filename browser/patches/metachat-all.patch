@@ -1818,6 +1818,10 @@ diff --git a/third_party/blink/renderer/core/css/media_values.cc b/third_party/b
 index 0d60244742506..4dfc4636dad74 100644
 --- a/third_party/blink/renderer/core/css/media_values.cc
 +++ b/third_party/blink/renderer/core/css/media_values.cc
+@@ -1,2 +1,3 @@
+ #include "third_party/blink/renderer/core/css/media_values.h"
++#include "base/logging.h"
+ #include "third_party/blink/public/common/css/scripting.h"
 @@ -353,20 +353,32 @@ mojom::blink::PointerType MediaValues::CalculatePrimaryPointerType(
      LocalFrame* frame) {
    DCHECK(frame);
@@ -7293,6 +7297,10 @@ diff --git a/third_party/blink/renderer/modules/webaudio/audio_context.cc b/thir
 index e60e454815d33..dea9295f2fe06 100644
 --- a/third_party/blink/renderer/modules/webaudio/audio_context.cc
 +++ b/third_party/blink/renderer/modules/webaudio/audio_context.cc
+@@ -1,2 +1,3 @@
+ #include "third_party/blink/renderer/modules/webaudio/audio_context.h"
++#include "base/logging.h"
+ #include <atomic>
 @@ -19,6 +19,7 @@
  #include "services/metrics/public/cpp/ukm_recorder.h"
  #include "third_party/blink/public/common/associated_interfaces/associated_interface_provider.h"
@@ -7649,6 +7657,10 @@ diff --git a/chrome/app/chrome_main_delegate.cc b/chrome/app/chrome_main_delegat
 index 14232136193ff..491c85a56a9cc 100644
 --- a/chrome/app/chrome_main_delegate.cc
 +++ b/chrome/app/chrome_main_delegate.cc
+@@ -1,2 +1,3 @@
+ #include "chrome/app/chrome_main_delegate.h"
++#include "base/logging.h"
+ #include <stddef.h>
 @@ -1058,6 +1058,164 @@ std::optional<int> ChromeMainDelegate::BasicStartupComplete() {
    ash::BootTimesRecorder::Get()->SaveChromeMainStats();
  #endif
@@ -9107,6 +9119,10 @@ diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui
 index ed69c678e9a8d..d206338d33205 100644
 --- a/chrome/browser/ui/browser_command_controller.cc
 +++ b/chrome/browser/ui/browser_command_controller.cc
+@@ -1,2 +1,3 @@
+ #include "chrome/browser/ui/browser_command_controller.h"
++#include "base/logging.h"
+ #include <stddef.h>
 @@ -221,6 +221,109 @@ void AppInfoDialogClosedCallback(SessionID session_id,
    }
  }

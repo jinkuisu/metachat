@@ -17,6 +17,10 @@ diff --git a/chrome/app/chrome_main_delegate.cc b/chrome/app/chrome_main_delegat
 index 14232136193ff..491c85a56a9cc 100644
 --- a/chrome/app/chrome_main_delegate.cc
 +++ b/chrome/app/chrome_main_delegate.cc
+@@ -1,2 +1,3 @@
+ #include "chrome/app/chrome_main_delegate.h"
++#include "base/logging.h"
+ #include <stddef.h>
 @@ -1058,6 +1058,164 @@ std::optional<int> ChromeMainDelegate::BasicStartupComplete() {
    ash::BootTimesRecorder::Get()->SaveChromeMainStats();
  #endif
