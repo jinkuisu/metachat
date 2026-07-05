@@ -98,7 +98,7 @@ jobs:
         shell: pwsh
         run: |
           $src = "$env:GITHUB_WORKSPACE\metachat\browser\assets"
-          if (Test-Path $src) { robocopy $src "$env:SRC_DIR" /MIR /NJH /NJS /NP }
+          if (Test-Path $src) { robocopy $src "$env:SRC_DIR" /E /NJH /NJS /NP }
 
 
       - name: Build overrides
