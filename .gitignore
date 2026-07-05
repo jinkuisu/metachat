@@ -3,6 +3,9 @@ browser/src/
 browser/out/
 browser/dist/
 browser/build/
+# ChromiumFish lean fonts (downloaded by GHA)
+browser/assets/third_party/lean_windows_fonts/
+
 
 # --- Rust / Cargo ---
 .cargo-out/
