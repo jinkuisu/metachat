@@ -90,6 +90,7 @@ jobs:
       - name: Configure GN
         shell: pwsh
         run: |
+          cd $env:SRC_DIR
           New-Item -ItemType Directory -Force -Path out\Release_GN_x64
           [System.IO.File]::WriteAllText("out\Release_GN_x64\args.gn", (
             "is_debug = false" + [char]10 +
