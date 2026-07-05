@@ -12995,7 +12995,9 @@ new file mode 100644
 +      MakeError("not_implemented",
 +          "notification: " + action + " not implemented"), request_id);
 +}
-diff --git a/chrome/common/webui_url_constants.cc
+diff --git a/chrome/common/webui_url_constants.cc b/chrome/common/webui_url_constants.cc
+--- a/chrome/common/webui_url_constants.cc
++++ b/chrome/common/webui_url_constants.cc
 @@ -119,6 +119,8 @@ bool IsSystemWebUIHost(std::string_view host) {
  
  // Add hosts here to be included in chrome://chrome-urls (about:about).
