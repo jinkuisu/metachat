@@ -142,7 +142,7 @@ jobs:
             "enable_extensions_core = true" + [char]10 +
             "dawn_enable_vulkan_validation_layers = false" + [char]10 +
             "angle_enable_vulkan_validation_layers = false"
-          )
+          ))
 
       - name: Build
         shell: pwsh
