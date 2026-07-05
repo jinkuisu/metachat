@@ -1,0 +1,371 @@
+# =============================================================================
+# MetaChat Message-Bus: 消息总线 - 账号管理与跨进程通信
+# =============================================================================
+# 功能说明：
+#   实现 MetaChat 多账号管理系统的消息总线
+#   通过 chrome://metachat/ WebUI 提供账号管理界面
+#   通过 IPC 消息总线协调多个账号实例之间的通信
+#
+# 修改文件：
+#   - chrome/browser/ui/webui/metachat/BUILD.gn (新文件)
+#   - chrome/browser/ui/webui/metachat/metachat_ui.h (新文件)
+#   - chrome/browser/ui/webui/metachat/metachat_ui.cc (新文件)
+#   - chrome/browser/ui/webui/metachat/metachat_account_store.h (新文件)
+#   - chrome/browser/ui/webui/metachat/metachat_account_store.cc (新文件)
+#   - chrome/browser/ui/webui/metachat/message_bus.h (新文件)
+#
+# 依赖关系：
+#   - 需要在 chrome/browser/ui/BUILD.gn 中添加 metachat 依赖
+#   - 需要在 chrome/browser/chrome_content_browser_client.cc 中注册 WebUI
+#   - 后续开发中需要添加更多 Handler 和 UI 组件
+#
+# MetaChat 自定义补丁（非 ChromiumFish 来源）
+# =============================================================================
+diff --git a/chrome/browser/ui/webui/metachat/BUILD.gn b/chrome/browser/ui/webui/metachat/BUILD.gn
+new file mode 100644
+--- /dev/null
++++ b/chrome/browser/ui/webui/metachat/BUILD.gn
+@@ -0,0 +1,18 @@
++# Copyright 2025 The MetaChat Authors. All rights reserved.
++
++source_set("metachat") {
++  sources = [
++    "message_bus.cc",
++    "message_bus.h",
++    "metachat_ui.cc",
++    "metachat_ui.h",
++  ]
++
++  public_deps = [
++    "//base",
++    "//base:trace_event",
++    "//chrome/browser/profiles:profile",
++    "//chrome/common",
++    "//content/public/browser",
++  ]
++}
+
+diff --git a/chrome/browser/ui/webui/metachat/metachat_ui.h b/chrome/browser/ui/webui/metachat/metachat_ui.h
+new file mode 100644
+--- /dev/null
++++ b/chrome/browser/ui/webui/metachat/metachat_ui.h
+@@ -0,0 +1,28 @@
++// Copyright 2025 The MetaChat Authors. All rights reserved.
++
++#ifndef CHROME_BROWSER_UI_WEBUI_METACHAT_METACHAT_UI_H_
++#define CHROME_BROWSER_UI_WEBUI_METACHAT_METACHAT_UI_H_
++
++#include <memory>
++#include <string>
++
++#include "content/public/browser/web_ui_controller.h"
++#include "content/public/browser/webui_config.h"
++
++class MetaChatUIConfig : public content::WebUIConfig {
++ public:
++  MetaChatUIConfig();
++  ~MetaChatUIConfig() override = default;
++  std::unique_ptr<content::WebUIController> CreateWebUIController(
++      content::WebUI* web_ui, const GURL& url) override;
++};
++
++class MetaChatUI : public content::WebUIController {
++ public:
++  explicit MetaChatUI(content::WebUI* web_ui);
++  ~MetaChatUI() override = default;
++ private:
++  WEB_UI_CONTROLLER_TYPE_DECL();
++};
++
++#endif  // CHROME_BROWSER_UI_WEBUI_METACHAT_METACHAT_UI_H_
+
+diff --git a/chrome/browser/ui/webui/metachat/metachat_ui.cc b/chrome/browser/ui/webui/metachat/metachat_ui.cc
+new file mode 100644
+--- /dev/null
++++ b/chrome/browser/ui/webui/metachat/metachat_ui.cc
+@@ -0,0 +1,32 @@
++// Copyright 2025 The MetaChat Authors. All rights reserved.
++
++#include "chrome/browser/ui/webui/metachat/metachat_ui.h"
++
++#include <memory>
++
++#include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/ui/webui/metachat/message_bus.h"
++#include "chrome/common/webui_url_constants.h"
++#include "content/public/browser/web_contents.h"
++#include "content/public/browser/web_ui.h"
++#include "content/public/browser/web_ui_data_source.h"
++
++MetaChatUIConfig::MetaChatUIConfig()
++    : WebUIConfig(content::kChromeUIScheme, chrome::kChromeUIMetaChatHost) {}
++
++std::unique_ptr<content::WebUIController>
++MetaChatUIConfig::CreateWebUIController(content::WebUI* web_ui,
++                                        const GURL& url) {
++  return std::make_unique<MetaChatUI>(web_ui);
++}
++
++MetaChatUI::MetaChatUI(content::WebUI* web_ui)
++    : WebUIController(web_ui) {
++  Profile* profile = Profile::FromWebUI(web_ui);
++  content::WebUIDataSource* source = content::WebUIDataSource::CreateAndAdd(
++      profile, chrome::kChromeUIMetaChatHost);
++  source->SetDefaultResource(100);
++  web_ui->AddMessageHandler(std::make_unique<MetaChatMessageBus>());
++}
++
++WEB_UI_CONTROLLER_TYPE_IMPL(MetaChatUI)
+
+diff --git a/chrome/browser/ui/webui/metachat/message_bus.h b/chrome/browser/ui/webui/metachat/message_bus.h
+new file mode 100644
+--- /dev/null
++++ b/chrome/browser/ui/webui/metachat/message_bus.h
+@@ -0,0 +1,53 @@
++// Copyright 2025 The MetaChat Authors. All rights reserved.
++
++#ifndef CHROME_BROWSER_UI_WEBUI_METACHAT_MESSAGE_BUS_H_
++#define CHROME_BROWSER_UI_WEBUI_METACHAT_MESSAGE_BUS_H_
++
++#include <string>
++
++#include "base/memory/raw_ptr.h"
++#include "base/values.h"
++#include "content/public/browser/web_ui_message_handler.h"
++
++class Profile;
++
++// MetaChat Message Bus - centralized JS <-> C++ communication.
++// Protocol: chrome.send("metachat.dispatch", [channel, action, payload, requestId, meta])
++// Channels: accounts | webs | cdp | config | notification
++// Meta: {timestamp, traceId, source} for debugging
++class MetaChatMessageBus : public content::WebUIMessageHandler {
++ public:
++  MetaChatMessageBus();
++  ~MetaChatMessageBus() override;
++  void RegisterMessages() override;
++  void SendEvent(const std::string& channel,
++                 const std::string& event_name,
++                 base::Value::Dict payload);
++
++ private:
++  void HandleDispatch(const base::Value::List& args);
++  void SendResponse(const std::string& channel,
++                    const std::string& action,
++                    base::Value::Dict payload,
++                    const std::string& request_id);
++  base::Value::Dict MakeError(const std::string& code,
++                              const std::string& message);
++  void HandleAccounts(const std::string& action,
++                      const base::Value::Dict* payload,
++                      const std::string& request_id);
++  void HandleWebs(const std::string& action,
++                  const base::Value::Dict* payload,
++                  const std::string& request_id);
++  void HandleCdp(const std::string& action,
++                 const base::Value::Dict* payload,
++                 const std::string& request_id);
++  void HandleConfig(const std::string& action,
++                    const base::Value::Dict* payload,
++                    const std::string& request_id);
++  void HandleNotification(const std::string& action,
++                          const base::Value::Dict* payload,
++                          const std::string& request_id);
++  raw_ptr<Profile> profile_ = nullptr;
++};
++
++#endif  // CHROME_BROWSER_UI_WEBUI_METACHAT_MESSAGE_BUS_H_
+
+diff --git a/chrome/browser/ui/webui/metachat/message_bus.cc b/chrome/browser/ui/webui/metachat/message_bus.cc
+new file mode 100644
+--- /dev/null
++++ b/chrome/browser/ui/webui/metachat/message_bus.cc
+@@ -0,0 +1,176 @@
++// MetaChat: Message bus - WebUI - C++ bidirectional communication
++// Copyright 2025 The MetaChat Authors. All rights reserved.
++
++#include "chrome/browser/ui/webui/metachat/message_bus.h"
++
++#include <utility>
++
++#include "base/json/json_writer.h"
++#include "base/logging.h"
++#include "base/strings/string_number_conversions.h"
++#include "base/time/time.h"
++#include "base/trace_event/trace_event.h"
++#include "chrome/browser/profiles/profile.h"
++#include "content/public/browser/web_ui.h"
++
++namespace {
++
++base::Value::Dict MakeResponse(const std::string& channel,
++                               const std::string& action_or_event,
++                               base::Value::Dict payload,
++                               const std::string& request_id,
++                               bool is_event) {
++  base::Value::Dict resp;
++  resp.Set("channel", channel);
++  if (is_event) {
++    resp.Set("event", action_or_event);
++  } else {
++    resp.Set("action", action_or_event);
++  }
++  resp.Set("payload", std::move(payload));
++  if (!request_id.empty()) {
++    resp.Set("requestId", request_id);
++  }
++  resp.Set("_serverTs", static_cast<double>(
++      base::Time::Now().InMillisecondsSinceUnixEpoch()));
++  return resp;
++}
++
++void LogMetaIfPresent(const base::Value::Dict* meta,
++                      const std::string& channel,
++                      const std::string& action,
++                      const std::string& request_id) {
++  if (!meta) return;
++  const std::string* trace_id = meta->FindString("traceId");
++  const std::string* source = meta->FindString("source");
++  double ts = meta->FindDouble("timestamp").value_or(0);
++  if (trace_id || source || ts > 0) {
++    DVLOG(1) << "MetaChat [" << channel << "." << action
++             << "] traceId=" << (trace_id ? *trace_id : "none")
++             << " source=" << (source ? *source : "unknown")
++             << " clientTs=" << base::NumberToString(static_cast<int64_t>(ts));
++  }
++}
++
++}  // namespace
++
++MetaChatMessageBus::MetaChatMessageBus() = default;
++MetaChatMessageBus::~MetaChatMessageBus() = default;
++
++void MetaChatMessageBus::RegisterMessages() {
++  profile_ = Profile::FromWebUI(web_ui());
++  web_ui()->RegisterMessageCallback(
++      "metachat.dispatch",
++      base::BindRepeating(&MetaChatMessageBus::HandleDispatch,
++                          base::Unretained(this)));
++}
++
++void MetaChatMessageBus::HandleDispatch(const base::Value::List& args) {
++  TRACE_EVENT0("metachat", "MetaChatMessageBus::HandleDispatch");
++  if (args.size() < 4) {
++    LOG(WARNING) << "MetaChatMessageBus: too few args (" << args.size() << ")";
++    return;
++  }
++  const std::string* channel = args[0].GetIfString();
++  const std::string* action = args[1].GetIfString();
++  const base::Value::Dict* payload = args[2].GetIfDict();
++  const std::string* request_id = args[3].GetIfString();
++  const base::Value::Dict* meta = nullptr;
++  if (args.size() >= 5) meta = args[4].GetIfDict();
++  if (!channel || !action || !request_id) {
++    LOG(WARNING) << "MetaChatMessageBus: invalid dispatch args";
++    return;
++  }
++  DVLOG(1) << "MetaChat: " << *channel << "." << *action
++           << " req=" << *request_id;
++  LogMetaIfPresent(meta, *channel, *action, *request_id);
++  if (*channel == "accounts")
++    HandleAccounts(*action, payload, *request_id);
++  else if (*channel == "webs")
++    HandleWebs(*action, payload, *request_id);
++  else if (*channel == "cdp")
++    HandleCdp(*action, payload, *request_id);
++  else if (*channel == "config")
++    HandleConfig(*action, payload, *request_id);
++  else if (*channel == "notification")
++    HandleNotification(*action, payload, *request_id);
++  else
++    SendResponse(*channel, *action,
++                 MakeError("unknown_channel", "Unknown: " + *channel),
++                 *request_id);
++}
++
++void MetaChatMessageBus::SendResponse(const std::string& channel,
++                                      const std::string& action,
++                                      base::Value::Dict payload,
++                                      const std::string& request_id) {
++  std::string json;
++  base::JSONWriter::Write(
++      MakeResponse(channel, action, std::move(payload), request_id, false),
++      &json);
++  web_ui()->CallJavascriptFunctionUnsafe("__metachat.onMessage",
++                                         base::Value(json));
++}
++
++void MetaChatMessageBus::SendEvent(const std::string& channel,
++                                   const std::string& event_name,
++                                   base::Value::Dict payload) {
++  std::string json;
++  base::JSONWriter::Write(
++      MakeResponse(channel, event_name, std::move(payload), "", true),
++      &json);
++  web_ui()->CallJavascriptFunctionUnsafe("__metachat.onMessage",
++                                         base::Value(json));
++}
++
++base::Value::Dict MetaChatMessageBus::MakeError(
++    const std::string& code, const std::string& message) {
++  base::Value::Dict err;
++  err.Set("error", code);
++  err.Set("message", message);
++  return err;
++}
++
++void MetaChatMessageBus::HandleAccounts(
++    const std::string& action, const base::Value::Dict* payload,
++    const std::string& request_id) {
++  if (action == "list") {
++    base::Value::Dict result;
++    result.Set("accounts", base::Value::List());
++    SendResponse("accounts", action, std::move(result), request_id);
++  } else {
++    SendResponse("accounts", action,
++        MakeError("not_implemented",
++            "accounts: " + action + " not implemented"), request_id);
++  }
++}
++
++void MetaChatMessageBus::HandleWebs(
++    const std::string& action, const base::Value::Dict* payload,
++    const std::string& request_id) {
++  SendResponse("webs", action,
++      MakeError("not_implemented", "webs: " + action + " not implemented"),
++      request_id);
++}
++
++void MetaChatMessageBus::HandleCdp(
++    const std::string& action, const base::Value::Dict* payload,
++    const std::string& request_id) {
++  SendResponse("cdp", action,
++      MakeError("not_implemented", "cdp: " + action + " not implemented"),
++      request_id);
++}
++
++void MetaChatMessageBus::HandleConfig(
++    const std::string& action, const base::Value::Dict* payload,
++    const std::string& request_id) {
++  SendResponse("config", action,
++      MakeError("not_implemented", "config: " + action + " not implemented"),
++      request_id);
++}
++
++void MetaChatMessageBus::HandleNotification(
++    const std::string& action, const base::Value::Dict* payload,
++    const std::string& request_id) {
++  SendResponse("notification", action,
++      MakeError("not_implemented",
++          "notification: " + action + " not implemented"), request_id);
++}
+diff --git a/chrome/common/webui_url_constants.cc
+@@ -119,6 +119,8 @@ bool IsSystemWebUIHost(std::string_view host) {
+ 
+ // Add hosts here to be included in chrome://chrome-urls (about:about).
+ // These hosts will also be suggested by BuiltinProvider.
++// MetaChat Browser
++inline constexpr char kChromeUIMetaChatURL[] = "chrome://metachat/";
+ base::span<const base::cstring_view> ChromeURLHosts() {
+   static constexpr auto kChromeURLHosts = std::to_array<base::cstring_view>({
+       kChromeUIAboutHost,

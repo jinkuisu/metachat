@@ -1,0 +1,101 @@
+# =============================================================================
+# Persona-Seed: 指纹种子注入 - 将指纹种子传递给渲染进程
+# =============================================================================
+# 功能说明：
+#   添加 --persona-seed 命令行开关，为每个浏览器会话选择指纹角色
+#   渲染进程在初始化时读取该种子值，用于确定性指纹生成
+#
+# 修改文件：
+#   1. content/browser/renderer_host/render_process_host_impl.cc
+#      - 在 kSwitchNames 中添加 kPersonaSeed，使其传递到渲染进程
+#      - 添加 "persona-os" 开关传递（用于指纹中的操作系统模拟）
+#      - 添加 canvas_bridge 开关传递（用于 Canvas/WebGL 指纹模拟）
+#
+#   2. content/public/common/content_switches.cc
+#      - 定义 kPersonaSeed 字符串常量 "persona-seed"
+#
+#   3. content/public/common/content_switches.h
+#      - 声明 kPersonaSeed 外部常量
+#
+# 依赖关系：
+#   - 下一个补丁 fingerprint-profile.patch 读取 kPersonaSeed 值
+#   - canvas-bridge/component.patch 定义 kCanvasBridgeUrl/Auth
+#
+# Fish 原始补丁说明：
+#   - Fish 将 canvas_bridge 和 persona-seed 放在同一个补丁中
+#   - 因为 Canvas 指纹组件需要跨进程传递开关
+#   - 我们保留此设计，确保功能完整
+#
+# 行号验证：Chromium 150.0.7844.0
+# - render_process_host_impl.cc:
+#   - #include 区: 行 68-76
+#   - kSwitchNames: 行 3836-3847 和 3977-3983
+# - content_switches.cc: 行 934-937
+# - content_switches.h: 行 97-103
+# =============================================================================
+
+diff --git a/content/browser/renderer_host/render_process_host_impl.cc b/content/browser/renderer_host/render_process_host_impl.cc
+index 2e1c77eaaca9a..17493057ca21e 100644
+--- a/content/browser/renderer_host/render_process_host_impl.cc
++++ b/content/browser/renderer_host/render_process_host_impl.cc
+@@ -71,6 +71,7 @@
+ #include "base/tracing/protos/chrome_track_event.pbzero.h"
+ #include "build/build_config.h"
+ #include "cc/base/switches.h"
++#include "components/canvas_bridge/public/canvas_bridge_switches.h"
+ #include "components/embedder_support/switches.h"
+ #include "components/input/features.h"
+ #include "components/input/utils.h"
+@@ -3839,6 +3840,9 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
+       switches::kDisableVideoCaptureUseGpuMemoryBuffer,
+       switches::kDomAutomationController,
+       switches::kEnableAutomation,
++      // MetaChat: 转发 --persona-seed 给渲染进程
++      // 渲染进程通过 kPersonaSeed 生成确定的指纹面具
++      switches::kPersonaSeed,
+       switches::kEnableExperimentalAccessibilityLanguageDetection,
+       switches::kEnableExperimentalAccessibilityLabelsDebugging,
+       switches::kEnableExperimentalWebPlatformFeatures,
+@@ -3980,6 +3984,12 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
+ #if BUILDFLAG(IS_CHROMEOS)
+       switches::kSchedulerBoostUrgent,
+ #endif
++      canvas_bridge::switches::kCanvasBridgeUrl,
++      canvas_bridge::switches::kCanvasBridgeAuth,
++      // MetaChat: 转发 --persona-os 给渲染进程
++      // fingerprint_profile.cc 根据此值读取操作系统指纹配置
++      "persona-os",
+   };
+   renderer_cmd->CopySwitchesFrom(browser_cmd, kSwitchNames);
+
+diff --git a/content/public/common/content_switches.cc b/content/public/common/content_switches.cc
+index a5dd79908643a..7a454d86f251c 100644
+--- a/content/public/common/content_switches.cc
++++ b/content/public/common/content_switches.cc
+@@ -934,6 +934,9 @@ const char kEnableAggressiveDOMStorageFlushing[] =
+ // Enable indication that browser is controlled by automation.
+ const char kEnableAutomation[] = "enable-automation";
+
++// MetaChat: 指纹种子开关 - 64 位无符号整数（十进制格式）
++// 每个浏览器会话由此种子值确定唯一的指纹面具
++const char kPersonaSeed[] = "persona-seed";
++
+ #if BUILDFLAG(IS_IOS)
+ // For mobile devices, tests should include a viewport meta tag to specify page
+ // dimension adjustments. Omitting the tag can lead to automatic resizing to
+diff --git a/content/public/common/content_switches.h b/content/public/common/content_switches.h
+index 17e834a0e19e6..7a946e6543366 100644
+--- a/content/public/common/content_switches.h
++++ b/content/public/common/content_switches.h
+@@ -97,6 +97,11 @@ CONTENT_EXPORT extern const char kDomAutomationController[];
+ extern const char kDisable2dCanvasClipAntialiasing[];
+ CONTENT_EXPORT extern const char kEnableAggressiveDOMStorageFlushing[];
+ CONTENT_EXPORT extern const char kEnableAutomation[];
++// MetaChat: 指纹种子常量（uint64 十进制字符串）
++// 被 Blink 的 fingerprinting::Current() 读取
++// 转发到所有渲染进程，确保同会话内指纹一致
++// 通过 --persona-seed=<value> 命令行传入
++CONTENT_EXPORT extern const char kPersonaSeed[];
+ CONTENT_EXPORT extern const char kEnableBlinkFeatures[];
+ CONTENT_EXPORT extern const char kEnableCaretBrowsing[];
+ CONTENT_EXPORT extern const char kEnableDisplayList2dCanvas[];

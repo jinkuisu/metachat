@@ -1,0 +1,82 @@
+# =============================================================================
+# Branding: 品牌名/产品名替换为 MetaChat
+# =============================================================================
+# 功能说明：
+#   将 Chromium 的产品名称、显示名称替换为 MetaChat
+#   这是 Fish 原版 branding 补丁的 MetaChat 定制版本
+#   （Fish 原版改为 ChromiumFish，我们改为 MetaChat）
+#
+# 修改文件：
+#   1. chrome/app/app-Info.plist
+#      - CFBundleDisplayName:  -> 
+#      - 使 macOS 上的显示名跟随 PRODUCT_SHORT_NAME 变量
+#
+#   2. chrome/app/chromium_strings.grd
+#      - IDS_PRODUCT_NAME: Chromium -> MetaChat
+#      - IDS_SHORT_PRODUCT_NAME: Chromium -> MetaChat
+#      - 所有使用 GetString(IDS_PRODUCT_NAME) 的地方都会返回 MetaChat
+#
+# 依赖关系：
+#   - branding/icons.patch 中的 BRANDING 文件定义了 PRODUCT_FULLNAME 等变量
+#   - 本补丁只改 .plist 和 .grd 字符串资源
+#   - 无 C++ 代码修改，无需 DVLOG
+#
+# 注意事项：
+#   - 如果之后要改产品名，只需要改这里 + BRANDING 文件
+#   - macOS 的 CFBundleDisplayName 用了变量，确保和 BRANDING 一致
+#
+# Fish 原始补丁对比：
+#   - Fish: Chromium -> ChromiumFish
+#   - 我们: Chromium -> MetaChat
+# =============================================================================
+
+# =============================================================================
+diff --git a/chrome/app/app-Info.plist b/chrome/app/app-Info.plist
+index 6fada0a2b1a1f..39c9a98bdadd1 100644
+--- a/chrome/app/app-Info.plist
++++ b/chrome/app/app-Info.plist
+@@ -5,7 +5,7 @@
+ 	<key>CFBundleDevelopmentRegion</key>
+ 	<string>en</string>
+ 	<key>CFBundleDisplayName</key>
+-	<string>${EXECUTABLE_NAME}</string>
++	<string>${CHROMIUM_SHORT_NAME}</string>
+ 	<key>CFBundleDocumentTypes</key>
+ 	<array>
+ 		<dict>
+diff --git a/chrome/app/chromium_strings.grd b/chrome/app/chromium_strings.grd
+index cb212bf396c79..94c1718e9ab11 100644
+--- a/chrome/app/chromium_strings.grd
++++ b/chrome/app/chromium_strings.grd
+@@ -294,9 +294,9 @@ If you update this file, be sure also to update google_chrome_strings.grd. -->
+         </then>
+         <else>
+           <message name="IDS_PRODUCT_NAME" desc="The Chrome application name" translateable="false">
+-            Chromium
++            MetaChat
+           </message>
+           <message name="IDS_SHORT_PRODUCT_NAME" desc="The Chrome application short name." translateable="false">
+-            Chromium
++            MetaChat
+           </message>
+         </else>
+       </if>
+\ndiff --git a/chrome/app/theme/chromium/BRANDING b/chrome/app/theme/chromium/BRANDING
+index f8363d5b294fe..75be9536318be 100644
+--- a/chrome/app/theme/chromium/BRANDING
++++ b/chrome/app/theme/chromium/BRANDING
+@@ -1,9 +1,9 @@
+ COMPANY_FULLNAME=The Chromium Authors
+ COMPANY_SHORTNAME=The Chromium Authors
+-PRODUCT_FULLNAME=Chromium
+-PRODUCT_SHORTNAME=Chromium
+-PRODUCT_INSTALLER_FULLNAME=Chromium Installer
+-PRODUCT_INSTALLER_SHORTNAME=Chromium Installer
++PRODUCT_FULLNAME=MetaChat
++PRODUCT_SHORTNAME=MetaChat
++PRODUCT_INSTALLER_FULLNAME=MetaChat Installer
++PRODUCT_INSTALLER_SHORTNAME=MetaChat Installer
+ COPYRIGHT=Copyright @LASTCHANGE_YEAR@ The Chromium Authors. All rights reserved.
+ MAC_BUNDLE_ID=org.chromium.Chromium
+ MAC_CREATOR_CODE=Cr24
+

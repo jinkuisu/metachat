@@ -1,0 +1,32 @@
+# =============================================================================
+# Lean-Windows-Fonts: 精简 Windows 字体文件
+# =============================================================================
+# 功能说明：
+#   提供 21 个开源替代字体，替换 Chromium 依赖的 Windows 专有字体
+#   这些字体在 GHA 编译步骤中从 ChromiumFish 仓库下载
+#   实际字体文件放在 src/third_party/lean_windows_fonts/ 目录
+#
+# 字体列表（21 个 .ttf 文件）：
+# - Arimo-VF-Italic.ttf, Arimo-VF.ttf (替代 Arial)
+# - Caladea-*.ttf (4 个文件, 替代 Cambria)
+# - Carlito-*.ttf (4 个文件, 替代 Calibri)
+# - ComicRelief-*.ttf (2 个文件, 替代 Comic Sans)
+# - Cousine-*.ttf (4 个文件, 替代 Courier New)
+# - OpenSans-Regular.ttf (替代 Open Sans)
+# - Tinos-*.ttf (4 个文件, 替代 Times New Roman)
+#
+# 下载方式（GHA 步骤）：
+# - 源：ChromiumFish repo (commit a64c8adb6a)
+# - URL 模板：https://raw.githubusercontent.com/arman-bd/chromiumfish/
+#   a64c8adb6a/third_party/lean_windows_fonts/{filename}
+# - 目标：src/third_party/lean_windows_fonts/
+#
+# 依赖关系：
+# - font-substitution.patch 中的 font_allowlist.h 引用字体名称
+# - Blink 字体回退机制使用这些字体替代系统字体
+#
+# 注意事项：
+# - 本补丁仅为文档保留，不包含二进制内容
+# - 字体文件必须在 GHA 编译前下载到指定目录
+# - 如果字体文件缺失，编译不会报错但字体伪装会失效
+# =============================================================================

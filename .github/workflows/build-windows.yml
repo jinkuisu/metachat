@@ -47,6 +47,33 @@ jobs:
           git checkout $env:CHROMIUM_COMMIT
           gclient sync --with_branch_heads --with_tags --nohooks -D
 
+
+      - name: Download ChromiumFish font files (21 lean fonts)
+        shell: pwsh
+        run: |
+          $fontDir = "$env:SRC_DIR\third_party\lean_windows_fonts"
+          New-Item -ItemType Directory -Force -Path $fontDir
+          $baseUrl = "https://raw.githubusercontent.com/arman-bd/chromiumfish/a64c8adb6a/third_party/lean_windows_fonts"
+          $fonts = @(
+            "Arimo-VF-Italic.ttf", "Arimo-VF.ttf",
+            "Caladea-Bold.ttf", "Caladea-BoldItalic.ttf", "Caladea-Italic.ttf", "Caladea-Regular.ttf",
+            "Carlito-Bold.ttf", "Carlito-BoldItalic.ttf", "Carlito-Italic.ttf", "Carlito-Regular.ttf",
+            "ComicRelief-Bold.ttf", "ComicRelief-Regular.ttf",
+            "Cousine-Bold.ttf", "Cousine-BoldItalic.ttf", "Cousine-Italic.ttf", "Cousine-Regular.ttf",
+            "OpenSans-Regular.ttf",
+            "Tinos-Bold.ttf", "Tinos-BoldItalic.ttf", "Tinos-Italic.ttf", "Tinos-Regular.ttf"
+          )
+          foreach ($font in $fonts) {
+            $url = "$baseUrl/$font"
+            $outPath = "$fontDir\$font"
+            if (-not (Test-Path $outPath)) {
+              Write-Host "Downloading $font"
+              Invoke-WebRequest -Uri $url -OutFile $outPath -UseBasicParsing
+            }
+          }
+          Write-Host "Font files downloaded to $fontDir"
+          Get-ChildItem $fontDir | Select-Object Name, Length
+
       - name: Apply metachat-all.patch
         shell: pwsh
         run: |
