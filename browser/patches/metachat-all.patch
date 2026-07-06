@@ -2703,11 +2703,12 @@ diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
 index e15713f1c9543..d251c656c767c 100644
 --- a/chrome/browser/ui/BUILD.gn
 +++ b/chrome/browser/ui/BUILD.gn
-@@ -288,6 +288,7 @@ static_library("ui") {
+@@ -288,6 +288,8 @@ static_library("ui") {
      ":url_identity",
      "//base",
      "//base:i18n",
 +    "//chrome/browser/ai_agent",
++    "//chrome/browser/ui/webui/metachat",
      "//base/allocator:buildflags",
      "//build:android_buildflags",
      "//build:branding_buildflags",
@@ -3347,15 +3348,25 @@ new file mode 100644
 index 0000000000000..be988a35866f0
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/BUILD.gn
-@@ -0,0 +1,18 @@
+@@ -0,0 +1,28 @@
 +# Copyright 2025 The MetaChat Authors. All rights reserved.
 +
 +source_set("metachat") {
 +  sources = [
++    "account_store.cc",
++    "account_store.h",
++    "cdp_bridge.cc",
++    "cdp_bridge.h",
++    "data_model.cc",
++    "data_model.h",
++    "event_log.cc",
++    "event_log.h",
 +    "message_bus.cc",
 +    "message_bus.h",
 +    "metachat_ui.cc",
 +    "metachat_ui.h",
++    "window_manager.cc",
++    "window_manager.h",
 +  ]
 +
 +  public_deps = [
@@ -3847,6 +3858,7 @@ index 0000000000000..08cfcc4015447
 +  base::CreateDirectory(log_dir_);
 +}
 +void EventLogger::Log(const EventLog& entry) {
++  DVLOG(1) << "MetaChat: EventLog." << entry.type;
 +  base::FilePath path = GetLogPathForDate(entry.timestamp);
 +  std::vector<EventLog> events;
 +  if (base::PathExists(path)) {
@@ -4428,6 +4440,7 @@ index 0000000000000..53991c8d465c5
 +  content::WebUIDataSource* source = content::WebUIDataSource::CreateAndAdd(
 +      profile, chrome::kChromeUIMetaChatHost);
 +  source->SetDefaultResource(100);
++  DVLOG(1) << "MetaChat: UI created";
 +  web_ui->AddMessageHandler(std::make_unique<MetaChatMessageBus>());
 +}
 +

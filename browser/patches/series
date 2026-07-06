@@ -1,5 +1,5 @@
 branding/branding.patch
-#branding/icons.patch  # 跳过（二进制图标，由 GHA 通过 assets/ 处理）
+#branding/icons.patch  # Skipped - binary icons handled by GHA via assets/
 persona/persona-seed.patch
 persona/fingerprint-profile.patch
 privacy/disable-intrusive-apis.patch
@@ -7,7 +7,7 @@ fingerprint/navigator.patch
 fingerprint/display.patch
 fingerprint/device-sensors.patch
 fingerprint/timing-misc.patch
-#fonts/lean-windows-fonts.patch  # 字体由 GHA 单独下载，不是实际补丁
+#fonts/lean-windows-fonts.patch  # Fonts downloaded by GHA separately
 fonts/font-substitution.patch
 canvas-bridge/component.patch
 canvas-bridge/canvas2d.patch
