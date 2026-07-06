@@ -667,3 +667,18 @@ index dd37ab85cec11..4ff23f0e8ab8c 100644
    return *instance;
  }
  
+
+diff --git a/chrome/browser/ui/webui/chrome_web_ui_configs.cc b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
+index 76fa678e056b4..9d9a50254b896 100644
+--- a/chrome/browser/ui/webui/chrome_web_ui_configs.cc
++++ b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
+@@ -10,2 +10,3 @@
+ #include "chrome/browser/contextual_tasks/contextual_tasks_ui.h"
++#include "chrome/browser/ui/webui/metachat/metachat_ui.h"
+ #include "chrome/browser/glic/host/glic_ui.h"
+@@ -492,4 +493,5 @@ void RegisterChromeWebUIConfigs() {
+   map.AddWebUIConfig(std::make_unique<skills::SkillsUIConfig>());
++  map.AddWebUIConfig(std::make_unique<MetaChatUIConfig>());
+ #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+        // BUILDFLAG(IS_CHROMEOS)
+ }

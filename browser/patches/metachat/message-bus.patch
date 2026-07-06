@@ -184,6 +184,7 @@ new file mode 100644
 +// MetaChat: Message bus - WebUI - C++ bidirectional communication
 +// Copyright 2025 The MetaChat Authors. All rights reserved.
 +
++#include "base/logging.h"
 +#include "chrome/browser/ui/webui/metachat/message_bus.h"
 +
 +#include <utility>
@@ -309,7 +310,7 @@ new file mode 100644
 +base::Value::Dict MetaChatMessageBus::MakeError(
 +    const std::string& code, const std::string& message) {
 +  base::Value::Dict err;
-+  err.Set("error", code);
++  err.Set("_metachat_error_", code);
 +  err.Set("message", message);
 +  return err;
 +}
@@ -371,3 +372,11 @@ diff --git a/chrome/common/webui_url_constants.cc b/chrome/common/webui_url_cons
  base::span<const base::cstring_view> ChromeURLHosts() {
    static constexpr auto kChromeURLHosts = std::to_array<base::cstring_view>({
        kChromeUIAboutHost,
+
+
+diff --git a/chrome/common/webui_url_constants.h b/chrome/common/webui_url_constants.h
+--- a/chrome/common/webui_url_constants.h
++++ b/chrome/common/webui_url_constants.h
+@@ -219,6 +219,7 @@ inline constexpr char kChromeUIMemoryInternalsHost[] = "memory-internals";
++inline constexpr char kChromeUIMetaChatHost[] = "metachat";
+ inline constexpr char kChromeUIMetricsInternalsHost[] = "metrics-internals";

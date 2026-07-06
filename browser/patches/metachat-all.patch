@@ -1,36 +1,3 @@
-# =============================================================================
-# Branding: 品牌名/产品名替换为 MetaChat
-# =============================================================================
-# 功能说明：
-#   将 Chromium 的产品名称、显示名称替换为 MetaChat
-#   这是 Fish 原版 branding 补丁的 MetaChat 定制版本
-#   （Fish 原版改为 ChromiumFish，我们改为 MetaChat）
-#
-# 修改文件：
-#   1. chrome/app/app-Info.plist
-#      - CFBundleDisplayName:  -> 
-#      - 使 macOS 上的显示名跟随 PRODUCT_SHORT_NAME 变量
-#
-#   2. chrome/app/chromium_strings.grd
-#      - IDS_PRODUCT_NAME: Chromium -> MetaChat
-#      - IDS_SHORT_PRODUCT_NAME: Chromium -> MetaChat
-#      - 所有使用 GetString(IDS_PRODUCT_NAME) 的地方都会返回 MetaChat
-#
-# 依赖关系：
-#   - branding/icons.patch 中的 BRANDING 文件定义了 PRODUCT_FULLNAME 等变量
-#   - 本补丁只改 .plist 和 .grd 字符串资源
-#   - 无 C++ 代码修改，无需 DVLOG
-#
-# 注意事项：
-#   - 如果之后要改产品名，只需要改这里 + BRANDING 文件
-#   - macOS 的 CFBundleDisplayName 用了变量，确保和 BRANDING 一致
-#
-# Fish 原始补丁对比：
-#   - Fish: Chromium -> ChromiumFish
-#   - 我们: Chromium -> MetaChat
-# =============================================================================
-
-# =============================================================================
 diff --git a/chrome/app/app-Info.plist b/chrome/app/app-Info.plist
 index 6fada0a2b1a1f..39c9a98bdadd1 100644
 --- a/chrome/app/app-Info.plist
@@ -80,43 +47,6 @@ index f8363d5b294fe..75be9536318be 100644
  COPYRIGHT=Copyright @LASTCHANGE_YEAR@ The Chromium Authors. All rights reserved.
  MAC_BUNDLE_ID=org.chromium.Chromium
  MAC_CREATOR_CODE=Cr24
-
-
-# =============================================================================
-# Persona-Seed: 指纹种子注入 - 将指纹种子传递给渲染进程
-# =============================================================================
-# 功能说明：
-#   添加 --persona-seed 命令行开关，为每个浏览器会话选择指纹角色
-#   渲染进程在初始化时读取该种子值，用于确定性指纹生成
-#
-# 修改文件：
-#   1. content/browser/renderer_host/render_process_host_impl.cc
-#      - 在 kSwitchNames 中添加 kPersonaSeed，使其传递到渲染进程
-#      - 添加 "persona-os" 开关传递（用于指纹中的操作系统模拟）
-#      - 添加 canvas_bridge 开关传递（用于 Canvas/WebGL 指纹模拟）
-#
-#   2. content/public/common/content_switches.cc
-#      - 定义 kPersonaSeed 字符串常量 "persona-seed"
-#
-#   3. content/public/common/content_switches.h
-#      - 声明 kPersonaSeed 外部常量
-#
-# 依赖关系：
-#   - 下一个补丁 fingerprint-profile.patch 读取 kPersonaSeed 值
-#   - canvas-bridge/component.patch 定义 kCanvasBridgeUrl/Auth
-#
-# Fish 原始补丁说明：
-#   - Fish 将 canvas_bridge 和 persona-seed 放在同一个补丁中
-#   - 因为 Canvas 指纹组件需要跨进程传递开关
-#   - 我们保留此设计，确保功能完整
-#
-# 行号验证：Chromium 150.0.7844.0
-# - render_process_host_impl.cc:
-#   - #include 区: 行 68-76
-#   - kSwitchNames: 行 3836-3847 和 3977-3983
-# - content_switches.cc: 行 934-937
-# - content_switches.h: 行 97-103
-# =============================================================================
 
 diff --git a/content/browser/renderer_host/render_process_host_impl.cc b/content/browser/renderer_host/render_process_host_impl.cc
 index 2e1c77eaaca9a..17493057ca21e 100644
@@ -188,46 +118,6 @@ index 17e834a0e19e6..7a946e6543366 100644
  CONTENT_EXPORT extern const char kEnableBlinkFeatures[];
  CONTENT_EXPORT extern const char kEnableCaretBrowsing[];
  CONTENT_EXPORT extern const char kEnableDisplayList2dCanvas[];
-
-# =============================================================================
-# Fingerprint-Profile: 指纹引擎核心 - 确定性指纹面具生成
-# =============================================================================
-# 功能说明：
-#   基于 --persona-seed 种子值，生成确定的指纹面具（profile）
-#   所有指纹相关参数（操作系统、浏览器版本、屏幕尺寸、WebGL 等）
-#   都由该引擎统一管理，确保同一会话内指纹一致
-#
-# 修改文件：
-#   1. third_party/blink/common/BUILD.gn
-#      - 添加 fingerprint_profile.cc 和 fingerprint_audio_isolation.cc
-#
-#   2. third_party/blink/common/fingerprinting/fingerprint_profile.cc (新文件)
-#      - 指纹面具引擎核心实现（440 行）
-#      - 包含：操作系统版本池、浏览器版本、屏幕尺寸、
-#        WebGL GPU 信息、时区、语言、字体等
-#      - 使用确定性随机引擎（PersonaSeedRng）确保可复现
-#
-#   3. third_party/blink/public/common/BUILD.gn
-#      - 添加 fingerprint_profile.h
-#
-#   4. third_party/blink/public/common/fingerprinting/fingerprint_profile.h (新文件)
-#      - 指纹面具接口声明
-#      - 定义 Persona 结构体和 DeriveFromSeed()
-#
-# 依赖关系：
-#   - 依赖 persona-seed.patch 的 --persona-seed 开关
-#   - 后续指纹补丁调用 DeriveFromSeed() 获取参数
-#
-# 行号验证：Chromium 150.0.7844.0
-# - blink/common/BUILD.gn: 行 148-153
-# - blink/public/common/BUILD.gn: 行 150-155
-# - fingerprint_profile.cc/.h: 新文件
-#
-# 注意事项：
-#   - Fish 指纹系统的核心，移除会导致所有指纹功能失效
-#   - 确定性随机使用 std::mt19937_64，种子来自命令行
-#   - 操作系统池支持 Win10/Win11/MacOS 14/15
-# =============================================================================
 
 diff --git a/third_party/blink/common/BUILD.gn b/third_party/blink/common/BUILD.gn
 index 6f48104544022..ca1df0809b316 100644
@@ -828,35 +718,6 @@ index 0000000000000..9c6078b9d6db4
 +
 +#endif  // THIRD_PARTY_BLINK_PUBLIC_COMMON_FINGERPRINTING_FINGERPRINT_PROFILE_H_
 
-# =============================================================================
-# Disable-Intrusive-APIs: 禁用隐私侵入性 API
-# =============================================================================
-# 功能说明：
-#   禁用 Chromium 中默认开启的隐私侵入性 API，减少指纹追踪面
-#   所有修改均为：FEATURE_ENABLED_BY_DEFAULT -> FEATURE_DISABLED_BY_DEFAULT
-#
-# 修改文件：
-#   1. content/public/common/content_features.cc
-#      - kWebUsb: 禁用 WebUSB API（USB 设备可被用于设备指纹）
-#
-#   2. third_party/blink/common/features.cc（多个修改点）
-#      - kBrowsingTopicsDocumentAPI: 禁用 Topics API（广告追踪）
-#      - kBrowsingTopicsParameters: 禁用 Topics 参数配置
-#      - kFledge: 禁用 FLEDGE（广告再营销追踪）
-#      - kFledgeBiddingAndAuctionServer: 禁用 FLEDGE 竞价服务器
-#      - kSharedStorageAPI: 禁用共享存储（跨站数据追踪）
-#      - kSharedStorageSelectURL: 禁用共享存储 URL 选择
-#      - kCookieDeprecationFacilitatedTesting: 禁用 Cookie 弃用测试
-#      - kPrivacySandboxAdsAPIsOverride: 禁用广告 API 覆盖
-#      - kPrivacySandboxSettings4: 禁用隐私沙箱设置
-#      - kAttributionReporting: 禁用归因报告（点击追踪）
-#      - kAttributionReportingCrossAppWeb: 禁用跨应用归因
-#
-# 行号验证：Chromium 150.0.7844.0
-# - content_features.cc: 行 1277-1283
-# - blink/common/features.cc: 行 233-243, 833-843, 更多...
-# =============================================================================
-
 diff --git a/content/public/common/content_features.cc b/content/public/common/content_features.cc
 index dd7b9aa06b988..0359b4b2d6811 100644
 --- a/content/public/common/content_features.cc
@@ -966,34 +827,6 @@ index 594cd59a601c2..3ad9dd4c20499 100644
  
  const char kSkipTouchEventFilterTypeParamName[] = "type";
  const char kSkipTouchEventFilterTypeParamValueDiscrete[] = "discrete";
-
-# =============================================================================
-# navigator: Navigator 指纹修改
-# =============================================================================
-# 功能说明：
-#   ChromiumFish 反指纹补丁系列
-#
-# 修改文件：
-#   - chrome/renderer/chrome_content_renderer_client.cc
-#   - components/embedder_support/user_agent_utils.cc
-#   - third_party/blink/renderer/bindings/core/v8/local_window_proxy.cc
-#   - third_party/blink/renderer/core/dom/element.cc
-#   - third_party/blink/renderer/core/dom/element.idl
-#   - third_party/blink/renderer/core/dom/events/event_target.idl
-#   - third_party/blink/renderer/core/execution_context/navigator_base.cc
-#   - third_party/blink/renderer/core/frame/local_dom_window.cc
-#   - third_party/blink/renderer/core/frame/navigator.cc
-#   - third_party/blink/renderer/core/frame/navigator_concurrent_hardware.cc
-#   - third_party/blink/renderer/core/frame/navigator_device_memory.cc
-#   - third_party/blink/renderer/core/frame/navigator_id.cc
-#   - third_party/blink/renderer/core/frame/navigator_language.cc
-#   - third_party/blink/renderer/core/workers/worker_navigator.cc
-#   - third_party/blink/renderer/modules/installedapp/navigator_installed_app.cc
-#   - third_party/blink/renderer/platform/runtime_enabled_features.json5
-#
-# 来源：ChromiumFish navigator.patch
-# 共 16 个 diff section
-# =============================================================================
 
 diff --git a/chrome/renderer/chrome_content_renderer_client.cc b/chrome/renderer/chrome_content_renderer_client.cc
 index e177eded759db..91ad0c23590f4 100644
@@ -1800,25 +1633,6 @@ index 368d39278163d..a6882cd5f1719 100644
      {
        name: "NetInfoDownlinkMax",
 
-# =============================================================================
-# display: 屏幕显示指纹修改
-# =============================================================================
-# 功能说明：
-#   ChromiumFish 反指纹补丁系列
-#
-# 修改文件：
-#   - third_party/blink/renderer/core/css/media_values.cc
-#   - third_party/blink/renderer/core/css/media_values_cached.cc
-#   - third_party/blink/renderer/core/css/media_values_dynamic.cc
-#   - third_party/blink/renderer/core/frame/screen.cc
-#   - third_party/blink/renderer/core/frame/screen.h
-#   - third_party/blink/renderer/core/scroll/scrollbar_theme_mac.cc
-#   - third_party/blink/renderer/modules/screen_details/screen_detailed.cc
-#
-# 来源：ChromiumFish display.patch
-# 共 7 个 diff section
-# =============================================================================
-
 diff --git a/third_party/blink/renderer/core/css/media_values.cc b/third_party/blink/renderer/core/css/media_values.cc
 index 0d60244742506..4dfc4636dad74 100644
 --- a/third_party/blink/renderer/core/css/media_values.cc
@@ -2192,28 +2006,6 @@ index 490cda360093f..2da2b3b011855 100644
  }
  
  bool ScreenDetailed::isPrimary() const {
-
-# =============================================================================
-# device-sensors: 设备传感器指纹
-# =============================================================================
-# 功能说明：
-#   ChromiumFish 反指纹补丁系列
-#
-# 修改文件：
-#   - content/browser/gpu/gpu_data_manager_impl_private.cc
-#   - third_party/blink/renderer/modules/battery/battery_manager.cc
-#   - third_party/blink/renderer/modules/keyboard/keyboard_layout.cc
-#   - third_party/blink/renderer/modules/keyboard/keyboard_layout.h
-#   - third_party/blink/renderer/modules/keyboard/navigator_keyboard.idl
-#   - third_party/blink/renderer/modules/media_capabilities/media_capabilities.cc
-#   - third_party/blink/renderer/modules/netinfo/navigator_network_information.idl
-#   - third_party/blink/renderer/modules/netinfo/network_information.cc
-#   - third_party/blink/renderer/modules/speech/speech_synthesis.cc
-#   - third_party/blink/renderer/modules/webgpu/gpu_adapter_info.cc
-#
-# 来源：ChromiumFish device-sensors.patch
-# 共 10 个 diff section
-# =============================================================================
 
 diff --git a/content/browser/gpu/gpu_data_manager_impl_private.cc b/content/browser/gpu/gpu_data_manager_impl_private.cc
 index 97e9f0acbd34f..e0aa15c873442 100644
@@ -2850,21 +2642,6 @@ index 9d155705c1350..57c0f90549119 100644
  
  const String& GPUAdapterInfo::device() const {
 
-# =============================================================================
-# timing-misc: 时间精度/杂项指纹
-# =============================================================================
-# 功能说明：
-#   ChromiumFish 反指纹补丁系列
-#
-# 修改文件：
-#   - third_party/blink/renderer/core/timing/time_clamper.h
-#   - third_party/blink/renderer/core/url/dom_url.cc
-#   - third_party/blink/renderer/modules/video_rvfc/video_frame_callback_requester_impl.cc
-#
-# 来源：ChromiumFish timing-misc.patch
-# 共 3 个 diff section
-# =============================================================================
-
 diff --git a/third_party/blink/renderer/core/timing/time_clamper.h b/third_party/blink/renderer/core/timing/time_clamper.h
 index a8b7d042e37e1..73f948e0aff6c 100644
 --- a/third_party/blink/renderer/core/timing/time_clamper.h
@@ -2943,23 +2720,6 @@ index 769a70e416c7e..127ced84c0b1e 100644
    constexpr auto kCoarseResolution = base::Microseconds(100);
    // Add this assert, in case TimeClamper's resolution were to change to be
    // stricter.
-
-# =============================================================================
-# font-substitution: 字体替换伪装
-# =============================================================================
-# 功能说明：
-#   ChromiumFish 反指纹补丁系列
-#
-# 修改文件：
-#   - third_party/blink/public/common/fingerprinting/font_allowlist.h
-#   - third_party/blink/renderer/platform/fonts/alternate_font_family.h
-#   - third_party/blink/renderer/platform/fonts/font_cache.cc
-#   - third_party/blink/renderer/platform/fonts/font_fallback_list.cc
-#   - third_party/blink/renderer/platform/fonts/mac/font_cache_mac.mm
-#
-# 来源：ChromiumFish font-substitution.patch
-# 共 5 个 diff section
-# =============================================================================
 
 diff --git a/third_party/blink/public/common/fingerprinting/font_allowlist.h b/third_party/blink/public/common/fingerprinting/font_allowlist.h
 new file mode 100644
@@ -3475,28 +3235,6 @@ index ec06f7decbacf..c962cd6dfa3f9 100644
      substitute_font.reset(
          CTFontCreateForString(font_to_substitute.get(), string.get(), range));
    } else {
-
-# =============================================================================
-# component: Canvas 桥接组件
-# =============================================================================
-# 功能说明：
-#   ChromiumFish 反指纹补丁系列
-#
-# 修改文件：
-#   - components/canvas_bridge/BUILD.gn
-#   - components/canvas_bridge/canvas_bridge_switches.cc
-#   - components/canvas_bridge/public/canvas_bridge_switches.h
-#   - third_party/blink/renderer/controller/blink_initializer.cc
-#   - third_party/blink/renderer/platform/BUILD.gn
-#   - third_party/blink/renderer/platform/canvas_bridge/BUILD.gn
-#   - third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.cc
-#   - third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.h
-#   - third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_codec.cc
-#   - third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_codec.h
-#
-# 来源：ChromiumFish component.patch
-# 共 10 个 diff section
-# =============================================================================
 
 diff --git a/components/canvas_bridge/BUILD.gn b/components/canvas_bridge/BUILD.gn
 new file mode 100644
@@ -5792,26 +5530,6 @@ index 0000000000000..79e74cd3e5cef
 +
 +#endif  // THIRD_PARTY_BLINK_RENDERER_PLATFORM_CANVAS_BRIDGE_CANVAS_BRIDGE_CODEC_H_
 
-# =============================================================================
-# canvas2d: Canvas 2D 指纹
-# =============================================================================
-# 功能说明：
-#   ChromiumFish 反指纹补丁系列
-#
-# 修改文件：
-#   - third_party/blink/renderer/core/html/canvas/html_canvas_element.cc
-#   - third_party/blink/renderer/core/html/canvas/html_canvas_element.h
-#   - third_party/blink/renderer/core/html/canvas/text_metrics.h
-#   - third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc
-#   - third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.h
-#   - third_party/blink/renderer/modules/canvas/canvas2d/canvas_2d_recorder_context.cc
-#   - third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.cc
-#   - third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.h
-#
-# 来源：ChromiumFish canvas2d.patch
-# 共 8 个 diff section
-# =============================================================================
-
 diff --git a/third_party/blink/renderer/core/html/canvas/html_canvas_element.cc b/third_party/blink/renderer/core/html/canvas/html_canvas_element.cc
 index 2a199c115931e..6736d357c5aff 100644
 --- a/third_party/blink/renderer/core/html/canvas/html_canvas_element.cc
@@ -6540,20 +6258,6 @@ index 117bddcc7b266..f5446078bd706 100644
    void moveTo(double double_x, double double_y);
    void lineTo(double double_x, double double_y);
 
-# =============================================================================
-# webgl: WebGL 指纹
-# =============================================================================
-# 功能说明：
-#   ChromiumFish 反指纹补丁系列
-#
-# 修改文件：
-#   - third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
-#   - third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.h
-#
-# 来源：ChromiumFish webgl.patch
-# 共 2 个 diff section
-# =============================================================================
-
 diff --git a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
 index 172759394d7e0..91d91afabe393 100644
 --- a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
@@ -7272,22 +6976,6 @@ index aaee965c67969..ad5a589cf1579 100644
  
    void HoldReferenceToDrawingBuffer(DrawingBuffer*);
 
-# =============================================================================
-# webaudio: WebAudio 指纹
-# =============================================================================
-# 功能说明：
-#   ChromiumFish 反指纹补丁系列
-#
-# 修改文件：
-#   - third_party/blink/renderer/modules/webaudio/audio_context.cc
-#   - third_party/blink/renderer/modules/webaudio/audio_context.h
-#   - third_party/blink/renderer/modules/webaudio/offline_audio_context.cc
-#   - third_party/blink/renderer/modules/webaudio/offline_audio_destination_handler.cc
-#
-# 来源：ChromiumFish webaudio.patch
-# 共 4 个 diff section
-# =============================================================================
-
 diff --git a/third_party/blink/renderer/modules/webaudio/audio_context.cc b/third_party/blink/renderer/modules/webaudio/audio_context.cc
 index e60e454815d33..dea9295f2fe06 100644
 --- a/third_party/blink/renderer/modules/webaudio/audio_context.cc
@@ -7635,21 +7323,6 @@ index c02c792af301a..189fa86eb37dd 100644
  
      frames_processed_ += frames_available_to_copy;
 
-# =============================================================================
-# webrtc-leak-shield: WebRTC 泄露防护
-# =============================================================================
-# 功能说明：
-#   ChromiumFish 反指纹补丁系列
-#
-# 修改文件：
-#   - chrome/app/chrome_main_delegate.cc
-#   - third_party/blink/renderer/modules/mediastream/media_devices.cc
-#   - third_party/blink/renderer/modules/peerconnection/rtc_peer_connection.cc
-#
-# 来源：ChromiumFish webrtc-leak-shield.patch
-# 共 3 个 diff section
-# =============================================================================
-
 diff --git a/chrome/app/chrome_main_delegate.cc b/chrome/app/chrome_main_delegate.cc
 index 14232136193ff..491c85a56a9cc 100644
 --- a/chrome/app/chrome_main_delegate.cc
@@ -7913,20 +7586,6 @@ index 1d85fe3c79b61..6cd79827cd003 100644
    MaybeDispatchEvent(RTCPeerConnectionIceEvent::Create(ice_candidate));
  }
 
-# =============================================================================
-# tls-fingerprint: TLS 指纹伪装
-# =============================================================================
-# 功能说明：
-#   ChromiumFish 反指纹补丁系列
-#
-# 修改文件：
-#   - net/base/features.cc
-#   - net/socket/ssl_client_socket_impl.cc
-#
-# 来源：ChromiumFish tls-fingerprint.patch
-# 共 2 个 diff section
-# =============================================================================
-
 diff --git a/net/base/features.cc b/net/base/features.cc
 index 98b21d5fad16d..0905678103038 100644
 --- a/net/base/features.cc
@@ -7982,27 +7641,6 @@ index 307f596f3e017..718b2cfa5fd58 100644
  
    // The compliance policy must be the last thing configured in order to have
    // defined behavior.
-
-# =============================================================================
-# humanized-input: 人性化输入模拟
-# =============================================================================
-# 功能说明：
-#   ChromiumFish 反指纹补丁系列
-#
-# 修改文件：
-#   - content/browser/BUILD.gn
-#   - content/browser/devtools/protocol/browser_handler.cc
-#   - content/browser/devtools/protocol/browser_handler.h
-#   - content/browser/devtools/protocol/humanized_cursor_overlay_mac.h
-#   - content/browser/devtools/protocol/humanized_cursor_overlay_mac.mm
-#   - content/browser/devtools/protocol/input_handler.cc
-#   - content/browser/devtools/protocol/input_handler.h
-#   - content/browser/devtools/protocol_config.json
-#   - third_party/blink/public/devtools_protocol/domains/Browser.pdl
-#
-# 来源：ChromiumFish humanized-input.patch
-# 共 9 个 diff section
-# =============================================================================
 
 diff --git a/content/browser/BUILD.gn b/content/browser/BUILD.gn
 index 1519637194b4a..d562c9d90a510 100644
@@ -9020,29 +8658,365 @@ index 6015a94554c21..49e950d3f8f98 100644
 +      # recorded|replayed|healed. Persist this as the flow's plan for replay.
 +      string stepsJson
 
-# =============================================================================
-# chrome-ui: Chrome UI 隐藏
-# =============================================================================
-# 功能说明：
-#   ChromiumFish 反指纹补丁系列
-#
-# 修改文件：
-#   - chrome/browser/app_controller_mac.mm
-#   - chrome/browser/ui/browser_command_controller.cc
-#   - chrome/browser/ui/read_anything/read_anything_entry_point_controller.cc
-#   - chrome/browser/ui/startup/bad_flags_prompt.cc
-#   - chrome/browser/ui/startup/infobar_utils.cc
-#   - chrome/browser/ui/toolbar/app_menu_model.cc
-#   - chrome/browser/ui/views/bookmarks/bookmark_page_action_controller.cc
-#   - chrome/browser/ui/views/frame/browser_view.cc
-#   - chrome/browser/ui/views/location_bar/location_bar_view.cc
-#   - chrome/browser/ui/views/toolbar/toolbar_view.cc
-#   - chrome/browser/ui/webui/chrome_web_ui_configs.cc
-#   - chrome/common/webui_url_constants.cc
-#
-# 来源：ChromiumFish chrome-ui.patch
-# 共 12 个 diff section
-# =============================================================================
+diff --git a/chrome/browser/ui/webui/metachat/BUILD.gn b/chrome/browser/ui/webui/metachat/BUILD.gn
+new file mode 100644
+--- /dev/null
++++ b/chrome/browser/ui/webui/metachat/BUILD.gn
+@@ -0,0 +1,18 @@
++# Copyright 2025 The MetaChat Authors. All rights reserved.
++
++source_set("metachat") {
++  sources = [
++    "message_bus.cc",
++    "message_bus.h",
++    "metachat_ui.cc",
++    "metachat_ui.h",
++  ]
++
++  public_deps = [
++    "//base",
++    "//base:trace_event",
++    "//chrome/browser/profiles:profile",
++    "//chrome/common",
++    "//content/public/browser",
++  ]
++}
+
+diff --git a/chrome/browser/ui/webui/metachat/metachat_ui.h b/chrome/browser/ui/webui/metachat/metachat_ui.h
+new file mode 100644
+--- /dev/null
++++ b/chrome/browser/ui/webui/metachat/metachat_ui.h
+@@ -0,0 +1,28 @@
++// Copyright 2025 The MetaChat Authors. All rights reserved.
++
++#ifndef CHROME_BROWSER_UI_WEBUI_METACHAT_METACHAT_UI_H_
++#define CHROME_BROWSER_UI_WEBUI_METACHAT_METACHAT_UI_H_
++
++#include <memory>
++#include <string>
++
++#include "content/public/browser/web_ui_controller.h"
++#include "content/public/browser/webui_config.h"
++
++class MetaChatUIConfig : public content::WebUIConfig {
++ public:
++  MetaChatUIConfig();
++  ~MetaChatUIConfig() override = default;
++  std::unique_ptr<content::WebUIController> CreateWebUIController(
++      content::WebUI* web_ui, const GURL& url) override;
++};
++
++class MetaChatUI : public content::WebUIController {
++ public:
++  explicit MetaChatUI(content::WebUI* web_ui);
++  ~MetaChatUI() override = default;
++ private:
++  WEB_UI_CONTROLLER_TYPE_DECL();
++};
++
++#endif  // CHROME_BROWSER_UI_WEBUI_METACHAT_METACHAT_UI_H_
+
+diff --git a/chrome/browser/ui/webui/metachat/metachat_ui.cc b/chrome/browser/ui/webui/metachat/metachat_ui.cc
+new file mode 100644
+--- /dev/null
++++ b/chrome/browser/ui/webui/metachat/metachat_ui.cc
+@@ -0,0 +1,32 @@
++// Copyright 2025 The MetaChat Authors. All rights reserved.
++
++#include "chrome/browser/ui/webui/metachat/metachat_ui.h"
++
++#include <memory>
++
++#include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/ui/webui/metachat/message_bus.h"
++#include "chrome/common/webui_url_constants.h"
++#include "content/public/browser/web_contents.h"
++#include "content/public/browser/web_ui.h"
++#include "content/public/browser/web_ui_data_source.h"
++
++MetaChatUIConfig::MetaChatUIConfig()
++    : WebUIConfig(content::kChromeUIScheme, chrome::kChromeUIMetaChatHost) {}
++
++std::unique_ptr<content::WebUIController>
++MetaChatUIConfig::CreateWebUIController(content::WebUI* web_ui,
++                                        const GURL& url) {
++  return std::make_unique<MetaChatUI>(web_ui);
++}
++
++MetaChatUI::MetaChatUI(content::WebUI* web_ui)
++    : WebUIController(web_ui) {
++  Profile* profile = Profile::FromWebUI(web_ui);
++  content::WebUIDataSource* source = content::WebUIDataSource::CreateAndAdd(
++      profile, chrome::kChromeUIMetaChatHost);
++  source->SetDefaultResource(100);
++  web_ui->AddMessageHandler(std::make_unique<MetaChatMessageBus>());
++}
++
++WEB_UI_CONTROLLER_TYPE_IMPL(MetaChatUI)
+
+diff --git a/chrome/browser/ui/webui/metachat/message_bus.h b/chrome/browser/ui/webui/metachat/message_bus.h
+new file mode 100644
+--- /dev/null
++++ b/chrome/browser/ui/webui/metachat/message_bus.h
+@@ -0,0 +1,53 @@
++// Copyright 2025 The MetaChat Authors. All rights reserved.
++
++#ifndef CHROME_BROWSER_UI_WEBUI_METACHAT_MESSAGE_BUS_H_
++#define CHROME_BROWSER_UI_WEBUI_METACHAT_MESSAGE_BUS_H_
++
++#include <string>
++
++#include "base/memory/raw_ptr.h"
++#include "base/values.h"
++#include "content/public/browser/web_ui_message_handler.h"
++
++class Profile;
++
++// MetaChat Message Bus - centralized JS <-> C++ communication.
++// Protocol: chrome.send("metachat.dispatch", [channel, action, payload, requestId, meta])
++// Channels: accounts | webs | cdp | config | notification
++// Meta: {timestamp, traceId, source} for debugging
++class MetaChatMessageBus : public content::WebUIMessageHandler {
++ public:
++  MetaChatMessageBus();
++  ~MetaChatMessageBus() override;
++  void RegisterMessages() override;
++  void SendEvent(const std::string& channel,
++                 const std::string& event_name,
++                 base::Value::Dict payload);
++
++ private:
++  void HandleDispatch(const base::Value::List& args);
++  void SendResponse(const std::string& channel,
++                    const std::string& action,
++                    base::Value::Dict payload,
++                    const std::string& request_id);
++  base::Value::Dict MakeError(const std::string& code,
++                              const std::string& message);
++  void HandleAccounts(const std::string& action,
++                      const base::Value::Dict* payload,
++                      const std::string& request_id);
++  void HandleWebs(const std::string& action,
++                  const base::Value::Dict* payload,
++                  const std::string& request_id);
++  void HandleCdp(const std::string& action,
++                 const base::Value::Dict* payload,
++                 const std::string& request_id);
++  void HandleConfig(const std::string& action,
++                    const base::Value::Dict* payload,
++                    const std::string& request_id);
++  void HandleNotification(const std::string& action,
++                          const base::Value::Dict* payload,
++                          const std::string& request_id);
++  raw_ptr<Profile> profile_ = nullptr;
++};
++
++#endif  // CHROME_BROWSER_UI_WEBUI_METACHAT_MESSAGE_BUS_H_
+
+diff --git a/chrome/browser/ui/webui/metachat/message_bus.cc b/chrome/browser/ui/webui/metachat/message_bus.cc
+new file mode 100644
+--- /dev/null
++++ b/chrome/browser/ui/webui/metachat/message_bus.cc
+@@ -0,0 +1,178 @@
++// MetaChat: Message bus - WebUI - C++ bidirectional communication
++// Copyright 2025 The MetaChat Authors. All rights reserved.
++
++#include "base/logging.h"
++#include "chrome/browser/ui/webui/metachat/message_bus.h"
++
++#include <utility>
++
++#include "base/json/json_writer.h"
++#include "base/logging.h"
++#include "base/strings/string_number_conversions.h"
++#include "base/time/time.h"
++#include "base/trace_event/trace_event.h"
++#include "chrome/browser/profiles/profile.h"
++#include "content/public/browser/web_ui.h"
++
++namespace {
++
++base::Value::Dict MakeResponse(const std::string& channel,
++                               const std::string& action_or_event,
++                               base::Value::Dict payload,
++                               const std::string& request_id,
++                               bool is_event) {
++  base::Value::Dict resp;
++  resp.Set("channel", channel);
++  if (is_event) {
++    resp.Set("event", action_or_event);
++  } else {
++    resp.Set("action", action_or_event);
++  }
++  resp.Set("payload", std::move(payload));
++  if (!request_id.empty()) {
++    resp.Set("requestId", request_id);
++  }
++  resp.Set("_serverTs", static_cast<double>(
++      base::Time::Now().InMillisecondsSinceUnixEpoch()));
++  return resp;
++}
++
++void LogMetaIfPresent(const base::Value::Dict* meta,
++                      const std::string& channel,
++                      const std::string& action,
++                      const std::string& request_id) {
++  if (!meta) return;
++  const std::string* trace_id = meta->FindString("traceId");
++  const std::string* source = meta->FindString("source");
++  double ts = meta->FindDouble("timestamp").value_or(0);
++  if (trace_id || source || ts > 0) {
++    DVLOG(1) << "MetaChat [" << channel << "." << action
++             << "] traceId=" << (trace_id ? *trace_id : "none")
++             << " source=" << (source ? *source : "unknown")
++             << " clientTs=" << base::NumberToString(static_cast<int64_t>(ts));
++  }
++}
++
++}  // namespace
++
++MetaChatMessageBus::MetaChatMessageBus() = default;
++MetaChatMessageBus::~MetaChatMessageBus() = default;
++
++void MetaChatMessageBus::RegisterMessages() {
++  profile_ = Profile::FromWebUI(web_ui());
++  web_ui()->RegisterMessageCallback(
++      "metachat.dispatch",
++      base::BindRepeating(&MetaChatMessageBus::HandleDispatch,
++                          base::Unretained(this)));
++}
++
++void MetaChatMessageBus::HandleDispatch(const base::Value::List& args) {
++  TRACE_EVENT0("metachat", "MetaChatMessageBus::HandleDispatch");
++  if (args.size() < 4) {
++    LOG(WARNING) << "MetaChatMessageBus: too few args (" << args.size() << ")";
++    return;
++  }
++  const std::string* channel = args[0].GetIfString();
++  const std::string* action = args[1].GetIfString();
++  const base::Value::Dict* payload = args[2].GetIfDict();
++  const std::string* request_id = args[3].GetIfString();
++  const base::Value::Dict* meta = nullptr;
++  if (args.size() >= 5) meta = args[4].GetIfDict();
++  if (!channel || !action || !request_id) {
++    LOG(WARNING) << "MetaChatMessageBus: invalid dispatch args";
++    return;
++  }
++  DVLOG(1) << "MetaChat: " << *channel << "." << *action
++           << " req=" << *request_id;
++  LogMetaIfPresent(meta, *channel, *action, *request_id);
++  if (*channel == "accounts")
++    HandleAccounts(*action, payload, *request_id);
++  else if (*channel == "webs")
++    HandleWebs(*action, payload, *request_id);
++  else if (*channel == "cdp")
++    HandleCdp(*action, payload, *request_id);
++  else if (*channel == "config")
++    HandleConfig(*action, payload, *request_id);
++  else if (*channel == "notification")
++    HandleNotification(*action, payload, *request_id);
++  else
++    SendResponse(*channel, *action,
++                 MakeError("unknown_channel", "Unknown: " + *channel),
++                 *request_id);
++}
++
++void MetaChatMessageBus::SendResponse(const std::string& channel,
++                                      const std::string& action,
++                                      base::Value::Dict payload,
++                                      const std::string& request_id) {
++  std::string json;
++  base::JSONWriter::Write(
++      MakeResponse(channel, action, std::move(payload), request_id, false),
++      &json);
++  web_ui()->CallJavascriptFunctionUnsafe("__metachat.onMessage",
++                                         base::Value(json));
++}
++
++void MetaChatMessageBus::SendEvent(const std::string& channel,
++                                   const std::string& event_name,
++                                   base::Value::Dict payload) {
++  std::string json;
++  base::JSONWriter::Write(
++      MakeResponse(channel, event_name, std::move(payload), "", true),
++      &json);
++  web_ui()->CallJavascriptFunctionUnsafe("__metachat.onMessage",
++                                         base::Value(json));
++}
++
++base::Value::Dict MetaChatMessageBus::MakeError(
++    const std::string& code, const std::string& message) {
++  base::Value::Dict err;
++  err.Set("_metachat_error_", code);
++  err.Set("message", message);
++  return err;
++}
++
++void MetaChatMessageBus::HandleAccounts(
++    const std::string& action, const base::Value::Dict* payload,
++    const std::string& request_id) {
++  if (action == "list") {
++    base::Value::Dict result;
++    result.Set("accounts", base::Value::List());
++    SendResponse("accounts", action, std::move(result), request_id);
++  } else {
++    SendResponse("accounts", action,
++        MakeError("not_implemented",
++            "accounts: " + action + " not implemented"), request_id);
++  }
++}
++
++void MetaChatMessageBus::HandleWebs(
++    const std::string& action, const base::Value::Dict* payload,
++    const std::string& request_id) {
++  SendResponse("webs", action,
++      MakeError("not_implemented", "webs: " + action + " not implemented"),
++      request_id);
++}
++
++void MetaChatMessageBus::HandleCdp(
++    const std::string& action, const base::Value::Dict* payload,
++    const std::string& request_id) {
++  SendResponse("cdp", action,
++      MakeError("not_implemented", "cdp: " + action + " not implemented"),
++      request_id);
++}
++
++void MetaChatMessageBus::HandleConfig(
++    const std::string& action, const base::Value::Dict* payload,
++    const std::string& request_id) {
++  SendResponse("config", action,
++      MakeError("not_implemented", "config: " + action + " not implemented"),
++      request_id);
++}
++
++void MetaChatMessageBus::HandleNotification(
++    const std::string& action, const base::Value::Dict* payload,
++    const std::string& request_id) {
++  SendResponse("notification", action,
++      MakeError("not_implemented",
++          "notification: " + action + " not implemented"), request_id);
++}
+diff --git a/chrome/common/webui_url_constants.cc b/chrome/common/webui_url_constants.cc
+--- a/chrome/common/webui_url_constants.cc
++++ b/chrome/common/webui_url_constants.cc
+@@ -119,6 +119,8 @@ bool IsSystemWebUIHost(std::string_view host) {
+ 
+ // Add hosts here to be included in chrome://chrome-urls (about:about).
+ // These hosts will also be suggested by BuiltinProvider.
++// MetaChat Browser
++inline constexpr char kChromeUIMetaChatURL[] = "chrome://metachat/";
+ base::span<const base::cstring_view> ChromeURLHosts() {
+   static constexpr auto kChromeURLHosts = std::to_array<base::cstring_view>({
+       kChromeUIAboutHost,
+
+
+diff --git a/chrome/common/webui_url_constants.h b/chrome/common/webui_url_constants.h
+--- a/chrome/common/webui_url_constants.h
++++ b/chrome/common/webui_url_constants.h
+@@ -219,6 +219,7 @@ inline constexpr char kChromeUIMemoryInternalsHost[] = "memory-internals";
++inline constexpr char kChromeUIMetaChatHost[] = "metachat";
+ inline constexpr char kChromeUIMetricsInternalsHost[] = "metrics-internals";
 
 diff --git a/chrome/browser/app_controller_mac.mm b/chrome/browser/app_controller_mac.mm
 index ae5df201946d0..7a58dbc28acb3 100644
@@ -9690,19 +9664,20 @@ index dd37ab85cec11..4ff23f0e8ab8c 100644
  }
  
 
-# =============================================================================
-# search-engines: 搜索引擎管理
-# =============================================================================
-# 功能说明：
-#   ChromiumFish 反指纹补丁系列
-#
-# 修改文件：
-#   - components/search_engines/template_url_service.cc
-#   - components/search_engines/template_url_starter_pack_data.cc
-#
-# 来源：ChromiumFish search-engines.patch
-# 共 2 个 diff section
-# =============================================================================
+diff --git a/chrome/browser/ui/webui/chrome_web_ui_configs.cc b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
+index 76fa678e056b4..9d9a50254b896 100644
+--- a/chrome/browser/ui/webui/chrome_web_ui_configs.cc
++++ b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
+@@ -10,2 +10,3 @@
+ #include "chrome/browser/contextual_tasks/contextual_tasks_ui.h"
++#include "chrome/browser/ui/webui/metachat/metachat_ui.h"
+ #include "chrome/browser/glic/host/glic_ui.h"
+@@ -492,4 +493,5 @@ void RegisterChromeWebUIConfigs() {
+   map.AddWebUIConfig(std::make_unique<skills::SkillsUIConfig>());
++  map.AddWebUIConfig(std::make_unique<MetaChatUIConfig>());
+ #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+        // BUILDFLAG(IS_CHROMEOS)
+ }
 
 diff --git a/components/search_engines/template_url_service.cc b/components/search_engines/template_url_service.cc
 index daf9e2d7df995..1fd5c8adb23f5 100644
@@ -9752,37 +9727,6 @@ index 4ad0bb0eb1c07..fe23ba9e49053 100644
  };
  
  int GetDataVersion() {
-
-# =============================================================================
-# agent-layer: AI Agent 层
-# =============================================================================
-# 功能说明：
-#   ChromiumFish 反指纹补丁系列
-#
-# 修改文件：
-#   - chrome/browser/ai_agent/BUILD.gn
-#   - chrome/browser/ai_agent/agent_controller.cc
-#   - chrome/browser/ai_agent/agent_controller.h
-#   - chrome/browser/ai_agent/agent_switches.cc
-#   - chrome/browser/ai_agent/agent_switches.h
-#   - chrome/browser/ai_agent/llm_client.cc
-#   - chrome/browser/ai_agent/llm_client.h
-#   - chrome/browser/ai_agent/page_serializer.cc
-#   - chrome/browser/ai_agent/page_serializer.h
-#   - chrome/browser/resources/actor_overlay/app.css
-#   - chrome/browser/resources/actor_overlay/app.html.ts
-#   - chrome/browser/ui/BUILD.gn
-#   - chrome/browser/ui/browser.cc
-#   - chrome/browser/ui/browser.h
-#   - content/browser/humanized_click.cc
-#   - content/public/browser/BUILD.gn
-#   - content/public/browser/humanized_click.h
-#   - content/public/browser/web_contents_delegate.cc
-#   - content/public/browser/web_contents_delegate.h
-#
-# 来源：ChromiumFish agent-layer.patch
-# 共 19 个 diff section
-# =============================================================================
 
 diff --git a/chrome/browser/ai_agent/BUILD.gn b/chrome/browser/ai_agent/BUILD.gn
 new file mode 100644
@@ -12603,377 +12547,3 @@ index 01caa48d282c0..041ac53bf435f 100644
  #if BUILDFLAG(IS_ANDROID)
    // Allow delegate to override how to take a snapshot of this WebContents into
    // a HardwareBuffer. Return true if the delegate will execute callback with a
-
-# =============================================================================
-# MetaChat Message-Bus: 消息总线 - 账号管理与跨进程通信
-# =============================================================================
-# 功能说明：
-#   实现 MetaChat 多账号管理系统的消息总线
-#   通过 chrome://metachat/ WebUI 提供账号管理界面
-#   通过 IPC 消息总线协调多个账号实例之间的通信
-#
-# 修改文件：
-#   - chrome/browser/ui/webui/metachat/BUILD.gn (新文件)
-#   - chrome/browser/ui/webui/metachat/metachat_ui.h (新文件)
-#   - chrome/browser/ui/webui/metachat/metachat_ui.cc (新文件)
-#   - chrome/browser/ui/webui/metachat/metachat_account_store.h (新文件)
-#   - chrome/browser/ui/webui/metachat/metachat_account_store.cc (新文件)
-#   - chrome/browser/ui/webui/metachat/message_bus.h (新文件)
-#
-# 依赖关系：
-#   - 需要在 chrome/browser/ui/BUILD.gn 中添加 metachat 依赖
-#   - 需要在 chrome/browser/chrome_content_browser_client.cc 中注册 WebUI
-#   - 后续开发中需要添加更多 Handler 和 UI 组件
-#
-# MetaChat 自定义补丁（非 ChromiumFish 来源）
-# =============================================================================
-diff --git a/chrome/browser/ui/webui/metachat/BUILD.gn b/chrome/browser/ui/webui/metachat/BUILD.gn
-new file mode 100644
---- /dev/null
-+++ b/chrome/browser/ui/webui/metachat/BUILD.gn
-@@ -0,0 +1,18 @@
-+# Copyright 2025 The MetaChat Authors. All rights reserved.
-+
-+source_set("metachat") {
-+  sources = [
-+    "message_bus.cc",
-+    "message_bus.h",
-+    "metachat_ui.cc",
-+    "metachat_ui.h",
-+  ]
-+
-+  public_deps = [
-+    "//base",
-+    "//base:trace_event",
-+    "//chrome/browser/profiles:profile",
-+    "//chrome/common",
-+    "//content/public/browser",
-+  ]
-+}
-
-diff --git a/chrome/browser/ui/webui/metachat/metachat_ui.h b/chrome/browser/ui/webui/metachat/metachat_ui.h
-new file mode 100644
---- /dev/null
-+++ b/chrome/browser/ui/webui/metachat/metachat_ui.h
-@@ -0,0 +1,28 @@
-+// Copyright 2025 The MetaChat Authors. All rights reserved.
-+
-+#ifndef CHROME_BROWSER_UI_WEBUI_METACHAT_METACHAT_UI_H_
-+#define CHROME_BROWSER_UI_WEBUI_METACHAT_METACHAT_UI_H_
-+
-+#include <memory>
-+#include <string>
-+
-+#include "content/public/browser/web_ui_controller.h"
-+#include "content/public/browser/webui_config.h"
-+
-+class MetaChatUIConfig : public content::WebUIConfig {
-+ public:
-+  MetaChatUIConfig();
-+  ~MetaChatUIConfig() override = default;
-+  std::unique_ptr<content::WebUIController> CreateWebUIController(
-+      content::WebUI* web_ui, const GURL& url) override;
-+};
-+
-+class MetaChatUI : public content::WebUIController {
-+ public:
-+  explicit MetaChatUI(content::WebUI* web_ui);
-+  ~MetaChatUI() override = default;
-+ private:
-+  WEB_UI_CONTROLLER_TYPE_DECL();
-+};
-+
-+#endif  // CHROME_BROWSER_UI_WEBUI_METACHAT_METACHAT_UI_H_
-
-diff --git a/chrome/browser/ui/webui/metachat/metachat_ui.cc b/chrome/browser/ui/webui/metachat/metachat_ui.cc
-new file mode 100644
---- /dev/null
-+++ b/chrome/browser/ui/webui/metachat/metachat_ui.cc
-@@ -0,0 +1,32 @@
-+// Copyright 2025 The MetaChat Authors. All rights reserved.
-+
-+#include "chrome/browser/ui/webui/metachat/metachat_ui.h"
-+
-+#include <memory>
-+
-+#include "chrome/browser/profiles/profile.h"
-+#include "chrome/browser/ui/webui/metachat/message_bus.h"
-+#include "chrome/common/webui_url_constants.h"
-+#include "content/public/browser/web_contents.h"
-+#include "content/public/browser/web_ui.h"
-+#include "content/public/browser/web_ui_data_source.h"
-+
-+MetaChatUIConfig::MetaChatUIConfig()
-+    : WebUIConfig(content::kChromeUIScheme, chrome::kChromeUIMetaChatHost) {}
-+
-+std::unique_ptr<content::WebUIController>
-+MetaChatUIConfig::CreateWebUIController(content::WebUI* web_ui,
-+                                        const GURL& url) {
-+  return std::make_unique<MetaChatUI>(web_ui);
-+}
-+
-+MetaChatUI::MetaChatUI(content::WebUI* web_ui)
-+    : WebUIController(web_ui) {
-+  Profile* profile = Profile::FromWebUI(web_ui);
-+  content::WebUIDataSource* source = content::WebUIDataSource::CreateAndAdd(
-+      profile, chrome::kChromeUIMetaChatHost);
-+  source->SetDefaultResource(100);
-+  web_ui->AddMessageHandler(std::make_unique<MetaChatMessageBus>());
-+}
-+
-+WEB_UI_CONTROLLER_TYPE_IMPL(MetaChatUI)
-
-diff --git a/chrome/browser/ui/webui/metachat/message_bus.h b/chrome/browser/ui/webui/metachat/message_bus.h
-new file mode 100644
---- /dev/null
-+++ b/chrome/browser/ui/webui/metachat/message_bus.h
-@@ -0,0 +1,53 @@
-+// Copyright 2025 The MetaChat Authors. All rights reserved.
-+
-+#ifndef CHROME_BROWSER_UI_WEBUI_METACHAT_MESSAGE_BUS_H_
-+#define CHROME_BROWSER_UI_WEBUI_METACHAT_MESSAGE_BUS_H_
-+
-+#include <string>
-+
-+#include "base/memory/raw_ptr.h"
-+#include "base/values.h"
-+#include "content/public/browser/web_ui_message_handler.h"
-+
-+class Profile;
-+
-+// MetaChat Message Bus - centralized JS <-> C++ communication.
-+// Protocol: chrome.send("metachat.dispatch", [channel, action, payload, requestId, meta])
-+// Channels: accounts | webs | cdp | config | notification
-+// Meta: {timestamp, traceId, source} for debugging
-+class MetaChatMessageBus : public content::WebUIMessageHandler {
-+ public:
-+  MetaChatMessageBus();
-+  ~MetaChatMessageBus() override;
-+  void RegisterMessages() override;
-+  void SendEvent(const std::string& channel,
-+                 const std::string& event_name,
-+                 base::Value::Dict payload);
-+
-+ private:
-+  void HandleDispatch(const base::Value::List& args);
-+  void SendResponse(const std::string& channel,
-+                    const std::string& action,
-+                    base::Value::Dict payload,
-+                    const std::string& request_id);
-+  base::Value::Dict MakeError(const std::string& code,
-+                              const std::string& message);
-+  void HandleAccounts(const std::string& action,
-+                      const base::Value::Dict* payload,
-+                      const std::string& request_id);
-+  void HandleWebs(const std::string& action,
-+                  const base::Value::Dict* payload,
-+                  const std::string& request_id);
-+  void HandleCdp(const std::string& action,
-+                 const base::Value::Dict* payload,
-+                 const std::string& request_id);
-+  void HandleConfig(const std::string& action,
-+                    const base::Value::Dict* payload,
-+                    const std::string& request_id);
-+  void HandleNotification(const std::string& action,
-+                          const base::Value::Dict* payload,
-+                          const std::string& request_id);
-+  raw_ptr<Profile> profile_ = nullptr;
-+};
-+
-+#endif  // CHROME_BROWSER_UI_WEBUI_METACHAT_MESSAGE_BUS_H_
-
-diff --git a/chrome/browser/ui/webui/metachat/message_bus.cc b/chrome/browser/ui/webui/metachat/message_bus.cc
-new file mode 100644
---- /dev/null
-+++ b/chrome/browser/ui/webui/metachat/message_bus.cc
-@@ -0,0 +1,178 @@
-+// MetaChat: Message bus - WebUI - C++ bidirectional communication
-+// Copyright 2025 The MetaChat Authors. All rights reserved.
-+
-+#include "chrome/browser/ui/webui/metachat/message_bus.h"
-+
-+#include <utility>
-+
-+#include "base/json/json_writer.h"
-+#include "base/logging.h"
-+#include "base/strings/string_number_conversions.h"
-+#include "base/time/time.h"
-+#include "base/trace_event/trace_event.h"
-+#include "chrome/browser/profiles/profile.h"
-+#include "content/public/browser/web_ui.h"
-+
-+namespace {
-+
-+base::Value::Dict MakeResponse(const std::string& channel,
-+                               const std::string& action_or_event,
-+                               base::Value::Dict payload,
-+                               const std::string& request_id,
-+                               bool is_event) {
-+  base::Value::Dict resp;
-+  resp.Set("channel", channel);
-+  if (is_event) {
-+    resp.Set("event", action_or_event);
-+  } else {
-+    resp.Set("action", action_or_event);
-+  }
-+  resp.Set("payload", std::move(payload));
-+  if (!request_id.empty()) {
-+    resp.Set("requestId", request_id);
-+  }
-+  resp.Set("_serverTs", static_cast<double>(
-+      base::Time::Now().InMillisecondsSinceUnixEpoch()));
-+  return resp;
-+}
-+
-+void LogMetaIfPresent(const base::Value::Dict* meta,
-+                      const std::string& channel,
-+                      const std::string& action,
-+                      const std::string& request_id) {
-+  if (!meta) return;
-+  const std::string* trace_id = meta->FindString("traceId");
-+  const std::string* source = meta->FindString("source");
-+  double ts = meta->FindDouble("timestamp").value_or(0);
-+  if (trace_id || source || ts > 0) {
-+    DVLOG(1) << "MetaChat [" << channel << "." << action
-+             << "] traceId=" << (trace_id ? *trace_id : "none")
-+             << " source=" << (source ? *source : "unknown")
-+             << " clientTs=" << base::NumberToString(static_cast<int64_t>(ts));
-+  }
-+}
-+
-+}  // namespace
-+
-+MetaChatMessageBus::MetaChatMessageBus() = default;
-+MetaChatMessageBus::~MetaChatMessageBus() = default;
-+
-+void MetaChatMessageBus::RegisterMessages() {
-+  profile_ = Profile::FromWebUI(web_ui());
-+  web_ui()->RegisterMessageCallback(
-+      "metachat.dispatch",
-+      base::BindRepeating(&MetaChatMessageBus::HandleDispatch,
-+                          base::Unretained(this)));
-+}
-+
-+void MetaChatMessageBus::HandleDispatch(const base::Value::List& args) {
-+  TRACE_EVENT0("metachat", "MetaChatMessageBus::HandleDispatch");
-+  if (args.size() < 4) {
-+    LOG(WARNING) << "MetaChatMessageBus: too few args (" << args.size() << ")";
-+    return;
-+  }
-+  const std::string* channel = args[0].GetIfString();
-+  const std::string* action = args[1].GetIfString();
-+  const base::Value::Dict* payload = args[2].GetIfDict();
-+  const std::string* request_id = args[3].GetIfString();
-+  const base::Value::Dict* meta = nullptr;
-+  if (args.size() >= 5) meta = args[4].GetIfDict();
-+  if (!channel || !action || !request_id) {
-+    LOG(WARNING) << "MetaChatMessageBus: invalid dispatch args";
-+    return;
-+  }
-+  DVLOG(1) << "MetaChat: " << *channel << "." << *action
-+           << " req=" << *request_id;
-+  LogMetaIfPresent(meta, *channel, *action, *request_id);
-+  if (*channel == "accounts")
-+    HandleAccounts(*action, payload, *request_id);
-+  else if (*channel == "webs")
-+    HandleWebs(*action, payload, *request_id);
-+  else if (*channel == "cdp")
-+    HandleCdp(*action, payload, *request_id);
-+  else if (*channel == "config")
-+    HandleConfig(*action, payload, *request_id);
-+  else if (*channel == "notification")
-+    HandleNotification(*action, payload, *request_id);
-+  else
-+    SendResponse(*channel, *action,
-+                 MakeError("unknown_channel", "Unknown: " + *channel),
-+                 *request_id);
-+}
-+
-+void MetaChatMessageBus::SendResponse(const std::string& channel,
-+                                      const std::string& action,
-+                                      base::Value::Dict payload,
-+                                      const std::string& request_id) {
-+  std::string json;
-+  base::JSONWriter::Write(
-+      MakeResponse(channel, action, std::move(payload), request_id, false),
-+      &json);
-+  web_ui()->CallJavascriptFunctionUnsafe("__metachat.onMessage",
-+                                         base::Value(json));
-+}
-+
-+void MetaChatMessageBus::SendEvent(const std::string& channel,
-+                                   const std::string& event_name,
-+                                   base::Value::Dict payload) {
-+  std::string json;
-+  base::JSONWriter::Write(
-+      MakeResponse(channel, event_name, std::move(payload), "", true),
-+      &json);
-+  web_ui()->CallJavascriptFunctionUnsafe("__metachat.onMessage",
-+                                         base::Value(json));
-+}
-+
-+base::Value::Dict MetaChatMessageBus::MakeError(
-+    const std::string& code, const std::string& message) {
-+  base::Value::Dict err;
-+  err.Set("error", code);
-+  err.Set("message", message);
-+  return err;
-+}
-+
-+void MetaChatMessageBus::HandleAccounts(
-+    const std::string& action, const base::Value::Dict* payload,
-+    const std::string& request_id) {
-+  if (action == "list") {
-+    base::Value::Dict result;
-+    result.Set("accounts", base::Value::List());
-+    SendResponse("accounts", action, std::move(result), request_id);
-+  } else {
-+    SendResponse("accounts", action,
-+        MakeError("not_implemented",
-+            "accounts: " + action + " not implemented"), request_id);
-+  }
-+}
-+
-+void MetaChatMessageBus::HandleWebs(
-+    const std::string& action, const base::Value::Dict* payload,
-+    const std::string& request_id) {
-+  SendResponse("webs", action,
-+      MakeError("not_implemented", "webs: " + action + " not implemented"),
-+      request_id);
-+}
-+
-+void MetaChatMessageBus::HandleCdp(
-+    const std::string& action, const base::Value::Dict* payload,
-+    const std::string& request_id) {
-+  SendResponse("cdp", action,
-+      MakeError("not_implemented", "cdp: " + action + " not implemented"),
-+      request_id);
-+}
-+
-+void MetaChatMessageBus::HandleConfig(
-+    const std::string& action, const base::Value::Dict* payload,
-+    const std::string& request_id) {
-+  SendResponse("config", action,
-+      MakeError("not_implemented", "config: " + action + " not implemented"),
-+      request_id);
-+}
-+
-+void MetaChatMessageBus::HandleNotification(
-+    const std::string& action, const base::Value::Dict* payload,
-+    const std::string& request_id) {
-+  SendResponse("notification", action,
-+      MakeError("not_implemented",
-+          "notification: " + action + " not implemented"), request_id);
-+}
-diff --git a/chrome/common/webui_url_constants.cc b/chrome/common/webui_url_constants.cc
---- a/chrome/common/webui_url_constants.cc
-+++ b/chrome/common/webui_url_constants.cc
-@@ -119,6 +119,8 @@ bool IsSystemWebUIHost(std::string_view host) {
- 
- // Add hosts here to be included in chrome://chrome-urls (about:about).
- // These hosts will also be suggested by BuiltinProvider.
-+// MetaChat Browser
-+inline constexpr char kChromeUIMetaChatURL[] = "chrome://metachat/";
- base::span<const base::cstring_view> ChromeURLHosts() {
-   static constexpr auto kChromeURLHosts = std::to_array<base::cstring_view>({
-       kChromeUIAboutHost,
