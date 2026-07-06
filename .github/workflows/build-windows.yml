@@ -6,10 +6,10 @@ on:
       chromium_commit:
         description: "Chromium base commit"
         required: true
-        default: "149.0.7827.115"
+        default: "150.0.7844.0"
 
 env:
-  CHROMIUM_COMMIT: ${{ github.event.inputs.chromium_commit || '149.0.7827.115' }}
+  CHROMIUM_COMMIT: ${{ github.event.inputs.chromium_commit || '150.0.7844.0' }}
   CHROMIUM_DIR: C:\chromium
   SRC_DIR: C:\chromium\src
 
@@ -42,7 +42,7 @@ jobs:
           cd $env:CHROMIUM_DIR
           fetch --nohooks --no-history chromium
           cd src
-          # Chromium 149.0.7827.115 鈥?matched to ChromiumFish version
+          # Chromium 150.0.7844.0 鈥?matched to ChromiumFish version
           git fetch origin tag $env:CHROMIUM_COMMIT --depth=1
           git checkout $env:CHROMIUM_COMMIT
           gclient sync --with_branch_heads --with_tags --nohooks -D
@@ -53,7 +53,7 @@ jobs:
         run: |
           $fontDir = "$env:SRC_DIR\third_party\lean_windows_fonts"
           New-Item -ItemType Directory -Force -Path $fontDir
-          $baseUrl = "https://raw.githubusercontent.com/arman-bd/chromiumfish/v149.0.7827.115/assets/third_party/lean_windows_fonts"
+          $baseUrl = "https://raw.githubusercontent.com/arman-bd/chromiumfish/v150.0.7844.0/assets/third_party/lean_windows_fonts"
           $fonts = @(
             "Arimo-VF-Italic.ttf", "Arimo-VF.ttf",
             "Caladea-Bold.ttf", "Caladea-BoldItalic.ttf", "Caladea-Italic.ttf", "Caladea-Regular.ttf",
