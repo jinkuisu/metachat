@@ -7,7 +7,7 @@ fingerprint/navigator.patch
 fingerprint/display.patch
 fingerprint/device-sensors.patch
 fingerprint/timing-misc.patch
-fonts/lean-windows-fonts.patch
+#fonts/lean-windows-fonts.patch  # 字体由 GHA 单独下载，不是实际补丁
 fonts/font-substitution.patch
 canvas-bridge/component.patch
 canvas-bridge/canvas2d.patch

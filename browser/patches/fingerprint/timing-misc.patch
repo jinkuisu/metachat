@@ -81,7 +81,7 @@ diff --git a/third_party/blink/renderer/modules/video_rvfc/video_frame_callback_
 index 769a70e416c7e..127ced84c0b1e 100644
 --- a/third_party/blink/renderer/modules/video_rvfc/video_frame_callback_requester_impl.cc
 +++ b/third_party/blink/renderer/modules/video_rvfc/video_frame_callback_requester_impl.cc
-@@ -316,6 +316,9 @@ double VideoFrameCallbackRequesterImpl::GetClampedTimeInMillis(
+@@ -308,6 +308,9 @@ double VideoFrameCallbackRequesterImpl::GetClampedTimeInMillis(
  // static
  double VideoFrameCallbackRequesterImpl::GetCoarseClampedTimeInSeconds(
      base::TimeDelta time) {

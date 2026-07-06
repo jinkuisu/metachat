@@ -98,8 +98,9 @@ diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui
 index ed69c678e9a8d..d206338d33205 100644
 --- a/chrome/browser/ui/browser_command_controller.cc
 +++ b/chrome/browser/ui/browser_command_controller.cc
-@@ -1,2 +1,3 @@
+@@ -5,3 +1,4 @@
  #include "chrome/browser/ui/browser_command_controller.h"
+ 
 +#include "base/logging.h"
  #include <stddef.h>
 @@ -221,6 +221,109 @@ void AppInfoDialogClosedCallback(SessionID session_id,
@@ -212,7 +213,7 @@ index ed69c678e9a8d..d206338d33205 100644
  bool CanOpenFile(Browser* browser) {
    if (browser->is_type_devtools() || browser->is_type_app() ||
        browser->is_type_app_popup()) {
-@@ -582,15 +685,24 @@ void BrowserCommandController::ShowCustomizeChromeSidePanel(
+@@ -582,15 +685,26 @@ void BrowserCommandController::ShowCustomizeChromeSidePanel(
  // BrowserCommandController, CommandUpdater implementation:
  
  bool BrowserCommandController::SupportsCommand(int id) const {
@@ -239,7 +240,7 @@ index ed69c678e9a8d..d206338d33205 100644
    return ExecuteCommandWithDisposition(id, WindowOpenDisposition::CURRENT_TAB,
                                         time_stamp);
  }
-@@ -599,6 +711,9 @@ bool BrowserCommandController::ExecuteCommandWithDisposition(
+@@ -599,6 +711,11 @@ bool BrowserCommandController::ExecuteCommandWithDisposition(
      int id,
      WindowOpenDisposition disposition,
      base::TimeTicks time_stamp) {

@@ -60,7 +60,7 @@ index 172759394d7e0..91d91afabe393 100644
    ContextGL()->BindBuffer(target, ObjectOrZero(buffer));
  }
  
-@@ -2701,6 +2717,20 @@ void WebGLRenderingContextBase::BufferDataImpl(GLenum target,
+@@ -2692,6 +2708,20 @@ void WebGLRenderingContextBase::BufferDataImpl(GLenum target,
  
    buffer->SetSize(size);
  
@@ -118,7 +118,7 @@ index 172759394d7e0..91d91afabe393 100644
    ContextGL()->CompileShader(ObjectOrZero(shader));
  }
  
-@@ -3056,7 +3102,15 @@ void WebGLRenderingContextBase::copyTexSubImage2D(GLenum target,
+@@ -3053,7 +3099,15 @@ void WebGLRenderingContextBase::copyTexSubImage2D(GLenum target,
  }
  
  WebGLBuffer* WebGLRenderingContextBase::createBuffer() {
@@ -135,7 +135,7 @@ index 172759394d7e0..91d91afabe393 100644
  }
  
  WebGLFramebuffer* WebGLRenderingContextBase::createFramebuffer() {
-@@ -3068,7 +3122,13 @@ WebGLTexture* WebGLRenderingContextBase::createTexture() {
+@@ -3060,7 +3114,13 @@ WebGLTexture* WebGLRenderingContextBase::createTexture() {
  }
  
  WebGLProgram* WebGLRenderingContextBase::createProgram() {
@@ -215,7 +215,7 @@ index 172759394d7e0..91d91afabe393 100644
    if (cap == GL_STENCIL_TEST) {
      stencil_enabled_ = true;
      ApplyDepthAndStencilTest();
-@@ -3443,6 +3531,11 @@ void WebGLRenderingContextBase::enableVertexAttribArray(GLuint index) {
+@@ -3434,6 +3522,11 @@ void WebGLRenderingContextBase::enableVertexAttribArray(GLuint index) {
    }
  
    bound_vertex_array_object_->SetAttribEnabled(index, true);
@@ -256,7 +256,7 @@ index 172759394d7e0..91d91afabe393 100644
      case GL_ALPHA_BITS:
        if (drawing_buffer_->RequiresAlphaChannelToBePreserved())
          return WebGLAny(script_state, 0);
-@@ -3970,28 +4077,48 @@ ScriptValue WebGLRenderingContextBase::getParameter(ScriptState* script_state,
+@@ -3966,28 +4073,48 @@ ScriptValue WebGLRenderingContextBase::getParameter(ScriptState* script_state,
        return GetIntParameter(script_state, pname);
      case GL_LINE_WIDTH:
        return GetFloatParameter(script_state, pname);
@@ -370,7 +370,7 @@ index 172759394d7e0..91d91afabe393 100644
        }
        SynthesizeGLError(
            GL_INVALID_ENUM, "getParameter",
-@@ -4110,8 +4252,7 @@ ScriptValue WebGLRenderingContextBase::getParameter(ScriptState* script_state,
+@@ -4101,8 +4243,7 @@ ScriptValue WebGLRenderingContextBase::getParameter(ScriptState* script_state,
        return ScriptValue::CreateNull(script_state->GetIsolate());
      case WebGLDebugRendererInfo::kUnmaskedVendorWebgl:
        if (ExtensionEnabled(kWebGLDebugRendererInfoName)) {
@@ -658,7 +658,7 @@ index 172759394d7e0..91d91afabe393 100644
    ContextGL()->Viewport(x, y, width, height);
  }
  
-@@ -9349,4 +9641,38 @@ bool WebGLRenderingContextBase::checkProgramCompletionQueryAvailable(
+@@ -9346,4 +9638,38 @@ bool WebGLRenderingContextBase::checkProgramCompletionQueryAvailable(
    }
    return false;
  }
@@ -716,7 +716,7 @@ index aaee965c67969..ad5a589cf1579 100644
   protected:
    // Implementation helpers.
    friend class ScopedPixelLocalStorageInterrupt;
-@@ -2012,6 +2020,12 @@ class MODULES_EXPORT WebGLRenderingContextBase
+@@ -2004,6 +2012,12 @@ class MODULES_EXPORT WebGLRenderingContextBase
  
    const Platform::WebGLContextType context_type_;
  

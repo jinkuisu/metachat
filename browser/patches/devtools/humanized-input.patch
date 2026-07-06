@@ -943,7 +943,7 @@ diff --git a/content/browser/devtools/protocol_config.json b/content/browser/dev
 index bd0f75dee534f..822db982542b0 100644
 --- a/content/browser/devtools/protocol_config.json
 +++ b/content/browser/devtools/protocol_config.json
-@@ -20,8 +20,8 @@
+@@ -12,8 +12,8 @@
              {
                  "domain": "Browser",
                  "include": ["getVersion", "getHistograms", "getHistogram", "getBrowserCommandLine", "grantPermissions", "setDownloadBehavior", "cancelDownload", "resetPermissions", "crash", "crashGpuProcess", "setPermission",

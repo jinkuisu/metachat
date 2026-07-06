@@ -48,7 +48,7 @@ diff --git a/chrome/app/chromium_strings.grd b/chrome/app/chromium_strings.grd
 index cb212bf396c79..94c1718e9ab11 100644
 --- a/chrome/app/chromium_strings.grd
 +++ b/chrome/app/chromium_strings.grd
-@@ -294,9 +294,9 @@ If you update this file, be sure also to update google_chrome_strings.grd. -->
+@@ -294,10 +294,10 @@ If you update this file, be sure also to update google_chrome_strings.grd. -->
          </then>
          <else>
            <message name="IDS_PRODUCT_NAME" desc="The Chrome application name" translateable="false">
@@ -140,7 +140,7 @@ index 2e1c77eaaca9a..17493057ca21e 100644
        switches::kEnableExperimentalAccessibilityLanguageDetection,
        switches::kEnableExperimentalAccessibilityLabelsDebugging,
        switches::kEnableExperimentalWebPlatformFeatures,
-@@ -3980,6 +3984,17 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
+@@ -3980,6 +3984,16 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
  #if BUILDFLAG(IS_CHROMEOS)
        switches::kSchedulerBoostUrgent,
  #endif
@@ -151,7 +151,6 @@ index 2e1c77eaaca9a..17493057ca21e 100644
 +      "persona-os",
    };
    renderer_cmd->CopySwitchesFrom(browser_cmd, kSwitchNames);
- 
 +  // MetaChat: DVLOG - 记录已转发的指纹种子
 +  DVLOG(1) << "MetaChat: persona-seed="
 +           << browser_cmd->GetSwitchValueASCII(switches::kPersonaSeed)
@@ -162,7 +161,7 @@ diff --git a/content/public/common/content_switches.cc b/content/public/common/c
 index a5dd79908643a..7a454d86f251c 100644
 --- a/content/public/common/content_switches.cc
 +++ b/content/public/common/content_switches.cc
-@@ -934,6 +934,9 @@ const char kEnableAggressiveDOMStorageFlushing[] =
+@@ -934,6 +934,10 @@ const char kEnableAggressiveDOMStorageFlushing[] =
  // Enable indication that browser is controlled by automation.
  const char kEnableAutomation[] = "enable-automation";
  
@@ -248,7 +247,7 @@ new file mode 100644
 index 0000000000000..6b7084d558386
 --- /dev/null
 +++ b/third_party/blink/common/fingerprinting/fingerprint_profile.cc
-@@ -0,0 +1,440 @@
+@@ -0,0 +1,444 @@
 +// Copyright 2026 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -862,7 +861,7 @@ diff --git a/content/public/common/content_features.cc b/content/public/common/c
 index dd7b9aa06b988..0359b4b2d6811 100644
 --- a/content/public/common/content_features.cc
 +++ b/content/public/common/content_features.cc
-@@ -1277,7 +1277,7 @@ BASE_FEATURE(kWebUIInProcessResourceLoadingV2,
+@@ -1268,7 +1268,7 @@ BASE_FEATURE(kWebUIInProcessResourceLoadingV2,
  
  // Controls whether the WebUSB API is enabled:
  // https://wicg.github.io/webusb
@@ -904,7 +903,7 @@ index 594cd59a601c2..3ad9dd4c20499 100644
  BASE_FEATURE_PARAM(std::string,
                     kFledgeBiddingAndAuctionKeyURL,
                     &kFledgeBiddingAndAuctionServer,
-@@ -850,7 +851,7 @@ BASE_FEATURE_PARAM(std::string,
+@@ -845,7 +846,7 @@ BASE_FEATURE_PARAM(std::string,
                     "");
  
  // See https://github.com/WICG/turtledove/issues/1334
@@ -950,7 +949,7 @@ index 594cd59a601c2..3ad9dd4c20499 100644
  
  BASE_FEATURE(kProcessHtmlDataImmediately, base::FEATURE_DISABLED_BY_DEFAULT);
  
-@@ -2334,13 +2336,13 @@ BASE_FEATURE(kSharedStorageWorkletSharedBackingThreadImplementation,
+@@ -2327,13 +2329,13 @@ BASE_FEATURE(kSharedStorageWorkletSharedBackingThreadImplementation,
               base::FEATURE_DISABLED_BY_DEFAULT);
  
  BASE_FEATURE(kSharedStorageCreateWorkletCustomDataOrigin,
@@ -1045,7 +1044,7 @@ index 608bea5cb3864..cd3a44bc25f95 100644
  
    std::string brand_version =
        output_version_type == blink::UserAgentBrandVersionType::kFullVersion
-@@ -183,8 +181,13 @@ const blink::UserAgentBrandList GetUserAgentBrandList(
+@@ -183,8 +181,16 @@ const blink::UserAgentBrandList GetUserAgentBrandList(
  // GetVersionNumber()
  const blink::UserAgentBrandList GetUserAgentBrandMajorVersionListInternal(
      std::optional<blink::UserAgentBrandVersion> additional_brand_version) {
@@ -1064,7 +1063,7 @@ index 608bea5cb3864..cd3a44bc25f95 100644
                                 blink::UserAgentBrandVersionType::kMajorVersion,
                                 additional_brand_version);
  }
-@@ -205,8 +208,10 @@ bool ShouldSendUserAgentUnifiedPlatform() {
+@@ -205,8 +208,13 @@ bool ShouldSendUserAgentUnifiedPlatform() {
  // GetVersionNumber()
  const blink::UserAgentBrandList GetUserAgentBrandFullVersionListInternal(
      std::optional<blink::UserAgentBrandVersion> additional_brand_version) {
@@ -1824,11 +1823,12 @@ diff --git a/third_party/blink/renderer/core/css/media_values.cc b/third_party/b
 index 0d60244742506..4dfc4636dad74 100644
 --- a/third_party/blink/renderer/core/css/media_values.cc
 +++ b/third_party/blink/renderer/core/css/media_values.cc
-@@ -1,2 +1,3 @@
+@@ -5,3 +1,4 @@
  #include "third_party/blink/renderer/core/css/media_values.h"
+ 
 +#include "base/logging.h"
  #include "third_party/blink/public/common/css/scripting.h"
-@@ -353,20 +353,32 @@ mojom::blink::PointerType MediaValues::CalculatePrimaryPointerType(
+@@ -353,20 +353,34 @@ mojom::blink::PointerType MediaValues::CalculatePrimaryPointerType(
      LocalFrame* frame) {
    DCHECK(frame);
    DCHECK(frame->GetSettings());
@@ -2758,7 +2758,7 @@ index a631d4f2b1c25..957729193205c 100644
  #include "third_party/blink/public/common/thread_safe_browser_interface_broker_proxy.h"
  #include "third_party/blink/public/platform/browser_interface_broker_proxy.h"
  #include "third_party/blink/public/platform/platform.h"
-@@ -93,8 +95,43 @@ void SpeechSynthesis::OnSetVoiceList(
+@@ -91,8 +93,43 @@ void SpeechSynthesis::OnSetVoiceList(
  }
  
  const HeapVector<Member<SpeechSynthesisVoice>>& SpeechSynthesis::getVoices() {
@@ -2816,7 +2816,7 @@ index 9d155705c1350..57c0f90549119 100644
  #include "third_party/blink/renderer/modules/webgpu/gpu_memory_heap_info.h"
  #include "third_party/blink/renderer/modules/webgpu/gpu_subgroup_matrix_config.h"
  
-@@ -46,11 +47,30 @@ void GPUAdapterInfo::AppendSubgroupMatrixConfig(
+@@ -41,11 +42,30 @@ void GPUAdapterInfo::AppendSubgroupMatrixConfig(
  }
  
  const String& GPUAdapterInfo::vendor() const {
@@ -2933,7 +2933,7 @@ diff --git a/third_party/blink/renderer/modules/video_rvfc/video_frame_callback_
 index 769a70e416c7e..127ced84c0b1e 100644
 --- a/third_party/blink/renderer/modules/video_rvfc/video_frame_callback_requester_impl.cc
 +++ b/third_party/blink/renderer/modules/video_rvfc/video_frame_callback_requester_impl.cc
-@@ -316,6 +316,9 @@ double VideoFrameCallbackRequesterImpl::GetClampedTimeInMillis(
+@@ -308,6 +308,9 @@ double VideoFrameCallbackRequesterImpl::GetClampedTimeInMillis(
  // static
  double VideoFrameCallbackRequesterImpl::GetCoarseClampedTimeInSeconds(
      base::TimeDelta time) {
@@ -2943,39 +2943,6 @@ index 769a70e416c7e..127ced84c0b1e 100644
    constexpr auto kCoarseResolution = base::Microseconds(100);
    // Add this assert, in case TimeClamper's resolution were to change to be
    // stricter.
-
-# =============================================================================
-# Lean-Windows-Fonts: 精简 Windows 字体文件
-# =============================================================================
-# 功能说明：
-#   提供 21 个开源替代字体，替换 Chromium 依赖的 Windows 专有字体
-#   这些字体在 GHA 编译步骤中从 ChromiumFish 仓库下载
-#   实际字体文件放在 src/third_party/lean_windows_fonts/ 目录
-#
-# 字体列表（21 个 .ttf 文件）：
-# - Arimo-VF-Italic.ttf, Arimo-VF.ttf (替代 Arial)
-# - Caladea-*.ttf (4 个文件, 替代 Cambria)
-# - Carlito-*.ttf (4 个文件, 替代 Calibri)
-# - ComicRelief-*.ttf (2 个文件, 替代 Comic Sans)
-# - Cousine-*.ttf (4 个文件, 替代 Courier New)
-# - OpenSans-Regular.ttf (替代 Open Sans)
-# - Tinos-*.ttf (4 个文件, 替代 Times New Roman)
-#
-# 下载方式（GHA 步骤）：
-# - 源：ChromiumFish repo (tag v149.0.7827.115)
-# - URL 模板：https://raw.githubusercontent.com/arman-bd/chromiumfish/
-#   v149.0.7827.115/assets/third_party/lean_windows_fonts/{filename}
-# - 目标：src/third_party/lean_windows_fonts/
-#
-# 依赖关系：
-# - font-substitution.patch 中的 font_allowlist.h 引用字体名称
-# - Blink 字体回退机制使用这些字体替代系统字体
-#
-# 注意事项：
-# - 本补丁仅为文档保留，不包含二进制内容
-# - 字体文件必须在 GHA 编译前下载到指定目录
-# - 如果字体文件缺失，编译不会报错但字体伪装会失效
-# =============================================================================
 
 # =============================================================================
 # font-substitution: 字体替换伪装
@@ -3399,7 +3366,7 @@ index 75cc0b764f8c4..00ad27fcc43e0 100644
  #include "third_party/blink/public/platform/platform.h"
  #include "third_party/blink/renderer/platform/font_family_names.h"
  #include "third_party/blink/renderer/platform/fonts/alternate_font_family.h"
-@@ -141,6 +143,57 @@ const FontPlatformData* FontCache::GetFontPlatformData(
+@@ -135,6 +137,57 @@ const FontPlatformData* FontCache::GetFontPlatformData(
    }
  #endif
  
@@ -3469,7 +3436,7 @@ index c38cf414f9e09..865c42c6b3a09 100644
  #include "third_party/blink/renderer/platform/font_family_names.h"
  #include "third_party/blink/renderer/platform/fonts/alternate_font_family.h"
  #include "third_party/blink/renderer/platform/fonts/font_cache.h"
-@@ -154,6 +155,21 @@ const FontData* FontFallbackList::GetFontData(
+@@ -148,6 +149,21 @@ const FontData* FontFallbackList::GetFontData(
  
    for (; curr_family; curr_family = curr_family->Next()) {
      family_index_++;
@@ -3670,7 +3637,7 @@ new file mode 100644
 index 0000000000000..a8b283e2dcdeb
 --- /dev/null
 +++ b/third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.cc
-@@ -0,0 +1,550 @@
+@@ -0,0 +1,569 @@
 +// Copyright (c) 2026 Arman Hossain <arman@bytetunnels.com>. ChromiumFish authors. All rights reserved.
 +
 +#ifdef UNSAFE_BUFFERS_BUILD
@@ -5917,7 +5884,7 @@ index 2a199c115931e..6736d357c5aff 100644
    if (image_bitmap) {
      std::unique_ptr<ImageDataBuffer> data_buffer =
          ImageDataBuffer::Create(image_bitmap);
-@@ -1370,6 +1401,10 @@ String HTMLCanvasElement::toDataURL(const String& mime_type,
+@@ -1365,6 +1396,10 @@ String HTMLCanvasElement::toDataURL(const String& mime_type,
      return String();
    }
  
@@ -5942,7 +5909,7 @@ diff --git a/third_party/blink/renderer/core/html/canvas/html_canvas_element.h b
 index 2b023e1a62915..39a1cda23e912 100644
 --- a/third_party/blink/renderer/core/html/canvas/html_canvas_element.h
 +++ b/third_party/blink/renderer/core/html/canvas/html_canvas_element.h
-@@ -454,6 +454,12 @@ class CORE_EXPORT HTMLCanvasElement final
+@@ -444,6 +444,12 @@ class CORE_EXPORT HTMLCanvasElement final
  
    bool did_notify_listeners_for_current_frame_ = false;
  
@@ -6066,7 +6033,7 @@ index 1422fe89b171d..1ab38296b988d 100644
  
    return image_data;
  }
-@@ -658,6 +702,10 @@ V8CanvasTextAlign BaseRenderingContext2D::textAlign() const {
+@@ -650,6 +694,10 @@ V8CanvasTextAlign BaseRenderingContext2D::textAlign() const {
  }
  
  void BaseRenderingContext2D::setTextAlign(const V8CanvasTextAlign align) {
@@ -6077,7 +6044,7 @@ index 1422fe89b171d..1ab38296b988d 100644
    GetState().SetTextAlign(align.AsEnum());
  }
  
-@@ -667,6 +715,11 @@ V8CanvasTextBaseline BaseRenderingContext2D::textBaseline() const {
+@@ -659,6 +707,11 @@ V8CanvasTextBaseline BaseRenderingContext2D::textBaseline() const {
  
  void BaseRenderingContext2D::setTextBaseline(
      const V8CanvasTextBaseline baseline) {
@@ -6101,7 +6068,7 @@ index 1422fe89b171d..1ab38296b988d 100644
    CanvasRenderingContext2DState& state = GetState();
    if (new_font == state.UnparsedFont() && CurrentFontResolvedAndUpToDate()) {
      return;
-@@ -863,6 +921,12 @@ void BaseRenderingContext2D::setDirection(const V8CanvasDirection direction) {
+@@ -859,6 +917,12 @@ void BaseRenderingContext2D::setDirection(const V8CanvasDirection direction) {
  }
  
  void BaseRenderingContext2D::fillText(const String& text, double x, double y) {
@@ -6140,7 +6107,7 @@ index 1422fe89b171d..1ab38296b988d 100644
    CanvasRenderingContext2DState& state = GetState();
    DrawTextInternal(text, x, y, CanvasRenderingContext2DState::kStrokePaintType,
                     state.GetTextAlign(), state.GetTextBaseline(), 0,
-@@ -929,6 +1005,12 @@ void BaseRenderingContext2D::strokeText(const String& text,
+@@ -920,6 +996,12 @@ void BaseRenderingContext2D::strokeText(const String& text,
                                          double x,
                                          double y,
                                          double max_width) {
@@ -6263,7 +6230,7 @@ index 6b85db957ef90..402140c747456 100644
  #include <algorithm>
  #include <array>
  #include <cmath>
-@@ -393,6 +396,10 @@ Canvas2DRecorderContext::~Canvas2DRecorderContext() {
+@@ -388,6 +391,10 @@ Canvas2DRecorderContext::~Canvas2DRecorderContext() {
  }
  
  void Canvas2DRecorderContext::save() {
@@ -6274,7 +6241,7 @@ index 6b85db957ef90..402140c747456 100644
    if (isContextLost()) [[unlikely]] {
      return;
    }
-@@ -418,6 +425,10 @@ void Canvas2DRecorderContext::save() {
+@@ -415,6 +422,10 @@ void Canvas2DRecorderContext::save() {
  }
  
  void Canvas2DRecorderContext::restore(ExceptionState& exception_state) {
@@ -6338,7 +6305,7 @@ index 6b85db957ef90..402140c747456 100644
    CanvasRenderingContext2DState& state = GetState();
    if (state.GlobalAlpha() == alpha) {
      return;
-@@ -1353,6 +1389,11 @@ void Canvas2DRecorderContext::setFilter(
+@@ -1346,6 +1382,11 @@ void Canvas2DRecorderContext::setFilter(
  }
  
  void Canvas2DRecorderContext::scale(double sx, double sy) {
@@ -6350,7 +6317,7 @@ index 6b85db957ef90..402140c747456 100644
    // TODO(crbug.com/40153853): Investigate the performance impact of simply
    // calling the 3d version of this function
    cc::PaintCanvas* c = GetOrCreatePaintCanvas();
-@@ -1383,6 +1424,11 @@ void Canvas2DRecorderContext::scale(double sx, double sy) {
+@@ -1374,6 +1415,11 @@ void Canvas2DRecorderContext::scale(double sx, double sy) {
  }
  
  void Canvas2DRecorderContext::rotate(double angle_in_radians) {
@@ -6362,7 +6329,7 @@ index 6b85db957ef90..402140c747456 100644
    cc::PaintCanvas* c = GetOrCreatePaintCanvas();
    if (!c) {
      return;
-@@ -1409,6 +1455,11 @@ void Canvas2DRecorderContext::rotate(double angle_in_radians) {
+@@ -1400,6 +1446,11 @@ void Canvas2DRecorderContext::rotate(double angle_in_radians) {
  }
  
  void Canvas2DRecorderContext::translate(double tx, double ty) {
@@ -6388,7 +6355,7 @@ index 6b85db957ef90..402140c747456 100644
  
    resetTransform();
    transform(m11, m12, m21, m22, dx, dy);
-@@ -1570,6 +1628,10 @@ AffineTransform Canvas2DRecorderContext::GetTransform() const {
+@@ -1566,6 +1624,10 @@ AffineTransform Canvas2DRecorderContext::GetTransform() const {
  }
  
  void Canvas2DRecorderContext::beginPath() {
@@ -6399,7 +6366,7 @@ index 6b85db957ef90..402140c747456 100644
    Clear();
  }
  
-@@ -1676,6 +1738,10 @@ void Canvas2DRecorderContext::fill(const V8CanvasFillRule& winding) {
+@@ -1666,6 +1728,10 @@ void Canvas2DRecorderContext::fill(const V8CanvasFillRule& winding) {
  }
  
  void Canvas2DRecorderContext::FillImpl(SkPathFillType winding_rule) {
@@ -6410,7 +6377,7 @@ index 6b85db957ef90..402140c747456 100644
    DrawPathInternal(*this, CanvasRenderingContext2DState::kFillPaintType,
                     winding_rule, UsePaintCache::kDisabled);
  }
-@@ -1696,6 +1762,10 @@ void Canvas2DRecorderContext::FillPathImpl(Path2D* dom_path,
+@@ -1690,6 +1756,10 @@ void Canvas2DRecorderContext::FillPathImpl(Path2D* dom_path,
  }
  
  void Canvas2DRecorderContext::stroke() {
@@ -6435,7 +6402,7 @@ index 6b85db957ef90..402140c747456 100644
    if (!GetOrCreatePaintCanvas()) {
      return;
    }
-@@ -1776,6 +1853,13 @@ void Canvas2DRecorderContext::strokeRect(double x,
+@@ -1766,6 +1843,13 @@ void Canvas2DRecorderContext::strokeRect(double x,
      return;
    }
  
@@ -6560,7 +6527,7 @@ diff --git a/third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.h b/
 index 117bddcc7b266..f5446078bd706 100644
 --- a/third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.h
 +++ b/third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.h
-@@ -75,6 +75,11 @@ class MODULES_EXPORT CanvasPath : public GarbageCollectedMixin {
+@@ -65,6 +65,11 @@ class MODULES_EXPORT CanvasPath : public GarbageCollectedMixin {
  
    virtual ~CanvasPath() = default;
  
@@ -6635,7 +6602,7 @@ index 172759394d7e0..91d91afabe393 100644
    ContextGL()->BindBuffer(target, ObjectOrZero(buffer));
  }
  
-@@ -2701,6 +2717,20 @@ void WebGLRenderingContextBase::BufferDataImpl(GLenum target,
+@@ -2692,6 +2708,20 @@ void WebGLRenderingContextBase::BufferDataImpl(GLenum target,
  
    buffer->SetSize(size);
  
@@ -6693,7 +6660,7 @@ index 172759394d7e0..91d91afabe393 100644
    ContextGL()->CompileShader(ObjectOrZero(shader));
  }
  
-@@ -3056,7 +3102,15 @@ void WebGLRenderingContextBase::copyTexSubImage2D(GLenum target,
+@@ -3053,7 +3099,15 @@ void WebGLRenderingContextBase::copyTexSubImage2D(GLenum target,
  }
  
  WebGLBuffer* WebGLRenderingContextBase::createBuffer() {
@@ -6710,7 +6677,7 @@ index 172759394d7e0..91d91afabe393 100644
  }
  
  WebGLFramebuffer* WebGLRenderingContextBase::createFramebuffer() {
-@@ -3068,7 +3122,13 @@ WebGLTexture* WebGLRenderingContextBase::createTexture() {
+@@ -3060,7 +3114,13 @@ WebGLTexture* WebGLRenderingContextBase::createTexture() {
  }
  
  WebGLProgram* WebGLRenderingContextBase::createProgram() {
@@ -6790,7 +6757,7 @@ index 172759394d7e0..91d91afabe393 100644
    if (cap == GL_STENCIL_TEST) {
      stencil_enabled_ = true;
      ApplyDepthAndStencilTest();
-@@ -3443,6 +3531,11 @@ void WebGLRenderingContextBase::enableVertexAttribArray(GLuint index) {
+@@ -3434,6 +3522,11 @@ void WebGLRenderingContextBase::enableVertexAttribArray(GLuint index) {
    }
  
    bound_vertex_array_object_->SetAttribEnabled(index, true);
@@ -6831,7 +6798,7 @@ index 172759394d7e0..91d91afabe393 100644
      case GL_ALPHA_BITS:
        if (drawing_buffer_->RequiresAlphaChannelToBePreserved())
          return WebGLAny(script_state, 0);
-@@ -3970,28 +4077,48 @@ ScriptValue WebGLRenderingContextBase::getParameter(ScriptState* script_state,
+@@ -3966,28 +4073,48 @@ ScriptValue WebGLRenderingContextBase::getParameter(ScriptState* script_state,
        return GetIntParameter(script_state, pname);
      case GL_LINE_WIDTH:
        return GetFloatParameter(script_state, pname);
@@ -6945,7 +6912,7 @@ index 172759394d7e0..91d91afabe393 100644
        }
        SynthesizeGLError(
            GL_INVALID_ENUM, "getParameter",
-@@ -4110,8 +4252,7 @@ ScriptValue WebGLRenderingContextBase::getParameter(ScriptState* script_state,
+@@ -4101,8 +4243,7 @@ ScriptValue WebGLRenderingContextBase::getParameter(ScriptState* script_state,
        return ScriptValue::CreateNull(script_state->GetIsolate());
      case WebGLDebugRendererInfo::kUnmaskedVendorWebgl:
        if (ExtensionEnabled(kWebGLDebugRendererInfoName)) {
@@ -7233,7 +7200,7 @@ index 172759394d7e0..91d91afabe393 100644
    ContextGL()->Viewport(x, y, width, height);
  }
  
-@@ -9349,4 +9641,38 @@ bool WebGLRenderingContextBase::checkProgramCompletionQueryAvailable(
+@@ -9346,4 +9638,38 @@ bool WebGLRenderingContextBase::checkProgramCompletionQueryAvailable(
    }
    return false;
  }
@@ -7291,7 +7258,7 @@ index aaee965c67969..ad5a589cf1579 100644
   protected:
    // Implementation helpers.
    friend class ScopedPixelLocalStorageInterrupt;
-@@ -2012,6 +2020,12 @@ class MODULES_EXPORT WebGLRenderingContextBase
+@@ -2004,6 +2012,12 @@ class MODULES_EXPORT WebGLRenderingContextBase
  
    const Platform::WebGLContextType context_type_;
  
@@ -7325,8 +7292,9 @@ diff --git a/third_party/blink/renderer/modules/webaudio/audio_context.cc b/thir
 index e60e454815d33..dea9295f2fe06 100644
 --- a/third_party/blink/renderer/modules/webaudio/audio_context.cc
 +++ b/third_party/blink/renderer/modules/webaudio/audio_context.cc
-@@ -1,2 +1,3 @@
+@@ -5,3 +1,4 @@
  #include "third_party/blink/renderer/modules/webaudio/audio_context.h"
+ 
 +#include "base/logging.h"
  #include <atomic>
 @@ -19,6 +19,7 @@
@@ -7361,7 +7329,7 @@ index e60e454815d33..dea9295f2fe06 100644
        update_echo_cancellation_on_first_start);
  
    TRACE_EVENT2("webaudio", "AudioContext::AudioContext", "UUID", Uuid(),
-@@ -1144,17 +1137,14 @@ double AudioContext::baseLatency() const {
+@@ -1149,17 +1142,20 @@ double AudioContext::baseLatency() const {
    DCHECK_CALLED_ON_VALID_SEQUENCE(main_thread_sequence_checker_);
    DCHECK(destination());
  
@@ -7377,7 +7345,7 @@ index e60e454815d33..dea9295f2fe06 100644
    DCHECK_CALLED_ON_VALID_SEQUENCE(main_thread_sequence_checker_);
    DCHECK(destination());
  
--  DeferredTaskHandler::GraphAutoLocker locker(this);
+-  DeferredTaskHandler::GraphAutoLocker locker(GetDeferredTaskHandler());
 -
 -  double factor = GetOutputLatencyQuantizingFactor();
 -  return std::round(output_position_.hardware_output_latency / factor) * factor;
@@ -7387,7 +7355,7 @@ index e60e454815d33..dea9295f2fe06 100644
  }
  
  AudioPlaybackStats* AudioContext::playbackStats() {
-@@ -1638,13 +1628,6 @@ void AudioContext::DidInitialPermissionCheck(
+@@ -1648,13 +1638,6 @@ void AudioContext::DidInitialPermissionCheck(
        std::move(observer));
  }
  
@@ -7686,11 +7654,12 @@ diff --git a/chrome/app/chrome_main_delegate.cc b/chrome/app/chrome_main_delegat
 index 14232136193ff..491c85a56a9cc 100644
 --- a/chrome/app/chrome_main_delegate.cc
 +++ b/chrome/app/chrome_main_delegate.cc
-@@ -1,2 +1,3 @@
+@@ -5,3 +1,4 @@
  #include "chrome/app/chrome_main_delegate.h"
+ 
 +#include "base/logging.h"
  #include <stddef.h>
-@@ -1058,6 +1058,164 @@ std::optional<int> ChromeMainDelegate::BasicStartupComplete() {
+@@ -1058,6 +1058,166 @@ std::optional<int> ChromeMainDelegate::BasicStartupComplete() {
    ash::BootTimesRecorder::Get()->SaveChromeMainStats();
  #endif
  
@@ -7962,7 +7931,7 @@ diff --git a/net/base/features.cc b/net/base/features.cc
 index 98b21d5fad16d..0905678103038 100644
 --- a/net/base/features.cc
 +++ b/net/base/features.cc
-@@ -613,7 +613,15 @@ BASE_FEATURE(kRestrictAbusePortsOnLocalhost, base::FEATURE_ENABLED_BY_DEFAULT);
+@@ -607,7 +607,15 @@ BASE_FEATURE(kRestrictAbusePortsOnLocalhost, base::FEATURE_ENABLED_BY_DEFAULT);
  
  BASE_FEATURE(kTLSTrustAnchorIDs, base::FEATURE_DISABLED_BY_DEFAULT);
  
@@ -8959,7 +8928,7 @@ diff --git a/content/browser/devtools/protocol_config.json b/content/browser/dev
 index bd0f75dee534f..822db982542b0 100644
 --- a/content/browser/devtools/protocol_config.json
 +++ b/content/browser/devtools/protocol_config.json
-@@ -20,8 +20,8 @@
+@@ -12,8 +12,8 @@
              {
                  "domain": "Browser",
                  "include": ["getVersion", "getHistograms", "getHistogram", "getBrowserCommandLine", "grantPermissions", "setDownloadBehavior", "cancelDownload", "resetPermissions", "crash", "crashGpuProcess", "setPermission",
@@ -9151,8 +9120,9 @@ diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui
 index ed69c678e9a8d..d206338d33205 100644
 --- a/chrome/browser/ui/browser_command_controller.cc
 +++ b/chrome/browser/ui/browser_command_controller.cc
-@@ -1,2 +1,3 @@
+@@ -5,3 +1,4 @@
  #include "chrome/browser/ui/browser_command_controller.h"
+ 
 +#include "base/logging.h"
  #include <stddef.h>
 @@ -221,6 +221,109 @@ void AppInfoDialogClosedCallback(SessionID session_id,
@@ -9265,7 +9235,7 @@ index ed69c678e9a8d..d206338d33205 100644
  bool CanOpenFile(Browser* browser) {
    if (browser->is_type_devtools() || browser->is_type_app() ||
        browser->is_type_app_popup()) {
-@@ -582,15 +685,24 @@ void BrowserCommandController::ShowCustomizeChromeSidePanel(
+@@ -582,15 +685,26 @@ void BrowserCommandController::ShowCustomizeChromeSidePanel(
  // BrowserCommandController, CommandUpdater implementation:
  
  bool BrowserCommandController::SupportsCommand(int id) const {
@@ -9292,7 +9262,7 @@ index ed69c678e9a8d..d206338d33205 100644
    return ExecuteCommandWithDisposition(id, WindowOpenDisposition::CURRENT_TAB,
                                         time_stamp);
  }
-@@ -599,6 +711,9 @@ bool BrowserCommandController::ExecuteCommandWithDisposition(
+@@ -599,6 +711,11 @@ bool BrowserCommandController::ExecuteCommandWithDisposition(
      int id,
      WindowOpenDisposition disposition,
      base::TimeTicks time_stamp) {
@@ -9738,7 +9708,7 @@ diff --git a/components/search_engines/template_url_service.cc b/components/sear
 index daf9e2d7df995..1fd5c8adb23f5 100644
 --- a/components/search_engines/template_url_service.cc
 +++ b/components/search_engines/template_url_service.cc
-@@ -1345,8 +1345,10 @@ DefaultSearchManager* TemplateURLService::GetDefaultSearchManager() {
+@@ -1341,8 +1341,10 @@ DefaultSearchManager* TemplateURLService::GetDefaultSearchManager() {
  }
  
  const TemplateURL* TemplateURLService::GetDefaultSearchProvider() const {
@@ -12211,7 +12181,7 @@ diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
 index 0290339053788..6e029726c5f32 100644
 --- a/chrome/browser/ui/BUILD.gn
 +++ b/chrome/browser/ui/BUILD.gn
-@@ -286,6 +286,7 @@ static_library("ui") {
+@@ -288,6 +288,7 @@ static_library("ui") {
      ":url_identity",
      "//base",
      "//base:i18n",
@@ -12816,7 +12786,7 @@ diff --git a/chrome/browser/ui/webui/metachat/message_bus.cc b/chrome/browser/ui
 new file mode 100644
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/message_bus.cc
-@@ -0,0 +1,176 @@
+@@ -0,0 +1,178 @@
 +// MetaChat: Message bus - WebUI - C++ bidirectional communication
 +// Copyright 2025 The MetaChat Authors. All rights reserved.
 +

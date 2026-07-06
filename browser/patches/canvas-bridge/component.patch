@@ -159,7 +159,7 @@ new file mode 100644
 index 0000000000000..a8b283e2dcdeb
 --- /dev/null
 +++ b/third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.cc
-@@ -0,0 +1,550 @@
+@@ -0,0 +1,569 @@
 +// Copyright (c) 2026 Arman Hossain <arman@bytetunnels.com>. ChromiumFish authors. All rights reserved.
 +
 +#ifdef UNSAFE_BUFFERS_BUILD

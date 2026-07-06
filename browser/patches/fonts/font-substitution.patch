@@ -420,7 +420,7 @@ index 75cc0b764f8c4..00ad27fcc43e0 100644
  #include "third_party/blink/public/platform/platform.h"
  #include "third_party/blink/renderer/platform/font_family_names.h"
  #include "third_party/blink/renderer/platform/fonts/alternate_font_family.h"
-@@ -141,6 +143,57 @@ const FontPlatformData* FontCache::GetFontPlatformData(
+@@ -135,6 +137,57 @@ const FontPlatformData* FontCache::GetFontPlatformData(
    }
  #endif
  
@@ -490,7 +490,7 @@ index c38cf414f9e09..865c42c6b3a09 100644
  #include "third_party/blink/renderer/platform/font_family_names.h"
  #include "third_party/blink/renderer/platform/fonts/alternate_font_family.h"
  #include "third_party/blink/renderer/platform/fonts/font_cache.h"
-@@ -154,6 +155,21 @@ const FontData* FontFallbackList::GetFontData(
+@@ -148,6 +149,21 @@ const FontData* FontFallbackList::GetFontData(
  
    for (; curr_family; curr_family = curr_family->Next()) {
      family_index_++;

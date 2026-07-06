@@ -563,7 +563,7 @@ index a631d4f2b1c25..957729193205c 100644
  #include "third_party/blink/public/common/thread_safe_browser_interface_broker_proxy.h"
  #include "third_party/blink/public/platform/browser_interface_broker_proxy.h"
  #include "third_party/blink/public/platform/platform.h"
-@@ -93,8 +95,43 @@ void SpeechSynthesis::OnSetVoiceList(
+@@ -91,8 +93,43 @@ void SpeechSynthesis::OnSetVoiceList(
  }
  
  const HeapVector<Member<SpeechSynthesisVoice>>& SpeechSynthesis::getVoices() {
@@ -621,7 +621,7 @@ index 9d155705c1350..57c0f90549119 100644
  #include "third_party/blink/renderer/modules/webgpu/gpu_memory_heap_info.h"
  #include "third_party/blink/renderer/modules/webgpu/gpu_subgroup_matrix_config.h"
  
-@@ -46,11 +47,30 @@ void GPUAdapterInfo::AppendSubgroupMatrixConfig(
+@@ -41,11 +42,30 @@ void GPUAdapterInfo::AppendSubgroupMatrixConfig(
  }
  
  const String& GPUAdapterInfo::vendor() const {

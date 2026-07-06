@@ -16,7 +16,7 @@ diff --git a/components/search_engines/template_url_service.cc b/components/sear
 index daf9e2d7df995..1fd5c8adb23f5 100644
 --- a/components/search_engines/template_url_service.cc
 +++ b/components/search_engines/template_url_service.cc
-@@ -1345,8 +1345,10 @@ DefaultSearchManager* TemplateURLService::GetDefaultSearchManager() {
+@@ -1341,8 +1341,10 @@ DefaultSearchManager* TemplateURLService::GetDefaultSearchManager() {
  }
  
  const TemplateURL* TemplateURLService::GetDefaultSearchProvider() const {

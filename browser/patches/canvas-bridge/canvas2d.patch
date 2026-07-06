@@ -90,7 +90,7 @@ index 2a199c115931e..6736d357c5aff 100644
    if (image_bitmap) {
      std::unique_ptr<ImageDataBuffer> data_buffer =
          ImageDataBuffer::Create(image_bitmap);
-@@ -1370,6 +1401,10 @@ String HTMLCanvasElement::toDataURL(const String& mime_type,
+@@ -1365,6 +1396,10 @@ String HTMLCanvasElement::toDataURL(const String& mime_type,
      return String();
    }
  
@@ -115,7 +115,7 @@ diff --git a/third_party/blink/renderer/core/html/canvas/html_canvas_element.h b
 index 2b023e1a62915..39a1cda23e912 100644
 --- a/third_party/blink/renderer/core/html/canvas/html_canvas_element.h
 +++ b/third_party/blink/renderer/core/html/canvas/html_canvas_element.h
-@@ -454,6 +454,12 @@ class CORE_EXPORT HTMLCanvasElement final
+@@ -444,6 +444,12 @@ class CORE_EXPORT HTMLCanvasElement final
  
    bool did_notify_listeners_for_current_frame_ = false;
  
@@ -239,7 +239,7 @@ index 1422fe89b171d..1ab38296b988d 100644
  
    return image_data;
  }
-@@ -658,6 +702,10 @@ V8CanvasTextAlign BaseRenderingContext2D::textAlign() const {
+@@ -650,6 +694,10 @@ V8CanvasTextAlign BaseRenderingContext2D::textAlign() const {
  }
  
  void BaseRenderingContext2D::setTextAlign(const V8CanvasTextAlign align) {
@@ -250,7 +250,7 @@ index 1422fe89b171d..1ab38296b988d 100644
    GetState().SetTextAlign(align.AsEnum());
  }
  
-@@ -667,6 +715,11 @@ V8CanvasTextBaseline BaseRenderingContext2D::textBaseline() const {
+@@ -659,6 +707,11 @@ V8CanvasTextBaseline BaseRenderingContext2D::textBaseline() const {
  
  void BaseRenderingContext2D::setTextBaseline(
      const V8CanvasTextBaseline baseline) {
@@ -274,7 +274,7 @@ index 1422fe89b171d..1ab38296b988d 100644
    CanvasRenderingContext2DState& state = GetState();
    if (new_font == state.UnparsedFont() && CurrentFontResolvedAndUpToDate()) {
      return;
-@@ -863,6 +921,12 @@ void BaseRenderingContext2D::setDirection(const V8CanvasDirection direction) {
+@@ -859,6 +917,12 @@ void BaseRenderingContext2D::setDirection(const V8CanvasDirection direction) {
  }
  
  void BaseRenderingContext2D::fillText(const String& text, double x, double y) {
@@ -313,7 +313,7 @@ index 1422fe89b171d..1ab38296b988d 100644
    CanvasRenderingContext2DState& state = GetState();
    DrawTextInternal(text, x, y, CanvasRenderingContext2DState::kStrokePaintType,
                     state.GetTextAlign(), state.GetTextBaseline(), 0,
-@@ -929,6 +1005,12 @@ void BaseRenderingContext2D::strokeText(const String& text,
+@@ -920,6 +996,12 @@ void BaseRenderingContext2D::strokeText(const String& text,
                                          double x,
                                          double y,
                                          double max_width) {
@@ -436,7 +436,7 @@ index 6b85db957ef90..402140c747456 100644
  #include <algorithm>
  #include <array>
  #include <cmath>
-@@ -393,6 +396,10 @@ Canvas2DRecorderContext::~Canvas2DRecorderContext() {
+@@ -388,6 +391,10 @@ Canvas2DRecorderContext::~Canvas2DRecorderContext() {
  }
  
  void Canvas2DRecorderContext::save() {
@@ -447,7 +447,7 @@ index 6b85db957ef90..402140c747456 100644
    if (isContextLost()) [[unlikely]] {
      return;
    }
-@@ -418,6 +425,10 @@ void Canvas2DRecorderContext::save() {
+@@ -415,6 +422,10 @@ void Canvas2DRecorderContext::save() {
  }
  
  void Canvas2DRecorderContext::restore(ExceptionState& exception_state) {
@@ -511,7 +511,7 @@ index 6b85db957ef90..402140c747456 100644
    CanvasRenderingContext2DState& state = GetState();
    if (state.GlobalAlpha() == alpha) {
      return;
-@@ -1353,6 +1389,11 @@ void Canvas2DRecorderContext::setFilter(
+@@ -1346,6 +1382,11 @@ void Canvas2DRecorderContext::setFilter(
  }
  
  void Canvas2DRecorderContext::scale(double sx, double sy) {
@@ -523,7 +523,7 @@ index 6b85db957ef90..402140c747456 100644
    // TODO(crbug.com/40153853): Investigate the performance impact of simply
    // calling the 3d version of this function
    cc::PaintCanvas* c = GetOrCreatePaintCanvas();
-@@ -1383,6 +1424,11 @@ void Canvas2DRecorderContext::scale(double sx, double sy) {
+@@ -1374,6 +1415,11 @@ void Canvas2DRecorderContext::scale(double sx, double sy) {
  }
  
  void Canvas2DRecorderContext::rotate(double angle_in_radians) {
@@ -535,7 +535,7 @@ index 6b85db957ef90..402140c747456 100644
    cc::PaintCanvas* c = GetOrCreatePaintCanvas();
    if (!c) {
      return;
-@@ -1409,6 +1455,11 @@ void Canvas2DRecorderContext::rotate(double angle_in_radians) {
+@@ -1400,6 +1446,11 @@ void Canvas2DRecorderContext::rotate(double angle_in_radians) {
  }
  
  void Canvas2DRecorderContext::translate(double tx, double ty) {
@@ -561,7 +561,7 @@ index 6b85db957ef90..402140c747456 100644
  
    resetTransform();
    transform(m11, m12, m21, m22, dx, dy);
-@@ -1570,6 +1628,10 @@ AffineTransform Canvas2DRecorderContext::GetTransform() const {
+@@ -1566,6 +1624,10 @@ AffineTransform Canvas2DRecorderContext::GetTransform() const {
  }
  
  void Canvas2DRecorderContext::beginPath() {
@@ -572,7 +572,7 @@ index 6b85db957ef90..402140c747456 100644
    Clear();
  }
  
-@@ -1676,6 +1738,10 @@ void Canvas2DRecorderContext::fill(const V8CanvasFillRule& winding) {
+@@ -1666,6 +1728,10 @@ void Canvas2DRecorderContext::fill(const V8CanvasFillRule& winding) {
  }
  
  void Canvas2DRecorderContext::FillImpl(SkPathFillType winding_rule) {
@@ -583,7 +583,7 @@ index 6b85db957ef90..402140c747456 100644
    DrawPathInternal(*this, CanvasRenderingContext2DState::kFillPaintType,
                     winding_rule, UsePaintCache::kDisabled);
  }
-@@ -1696,6 +1762,10 @@ void Canvas2DRecorderContext::FillPathImpl(Path2D* dom_path,
+@@ -1690,6 +1756,10 @@ void Canvas2DRecorderContext::FillPathImpl(Path2D* dom_path,
  }
  
  void Canvas2DRecorderContext::stroke() {
@@ -608,7 +608,7 @@ index 6b85db957ef90..402140c747456 100644
    if (!GetOrCreatePaintCanvas()) {
      return;
    }
-@@ -1776,6 +1853,13 @@ void Canvas2DRecorderContext::strokeRect(double x,
+@@ -1766,6 +1843,13 @@ void Canvas2DRecorderContext::strokeRect(double x,
      return;
    }
  
@@ -733,7 +733,7 @@ diff --git a/third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.h b/
 index 117bddcc7b266..f5446078bd706 100644
 --- a/third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.h
 +++ b/third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.h
-@@ -75,6 +75,11 @@ class MODULES_EXPORT CanvasPath : public GarbageCollectedMixin {
+@@ -65,6 +65,11 @@ class MODULES_EXPORT CanvasPath : public GarbageCollectedMixin {
  
    virtual ~CanvasPath() = default;
  

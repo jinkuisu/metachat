@@ -75,7 +75,7 @@ index 608bea5cb3864..cd3a44bc25f95 100644
  
    std::string brand_version =
        output_version_type == blink::UserAgentBrandVersionType::kFullVersion
-@@ -183,8 +181,13 @@ const blink::UserAgentBrandList GetUserAgentBrandList(
+@@ -183,8 +181,16 @@ const blink::UserAgentBrandList GetUserAgentBrandList(
  // GetVersionNumber()
  const blink::UserAgentBrandList GetUserAgentBrandMajorVersionListInternal(
      std::optional<blink::UserAgentBrandVersion> additional_brand_version) {
@@ -94,7 +94,7 @@ index 608bea5cb3864..cd3a44bc25f95 100644
                                 blink::UserAgentBrandVersionType::kMajorVersion,
                                 additional_brand_version);
  }
-@@ -205,8 +208,10 @@ bool ShouldSendUserAgentUnifiedPlatform() {
+@@ -205,8 +208,13 @@ bool ShouldSendUserAgentUnifiedPlatform() {
  // GetVersionNumber()
  const blink::UserAgentBrandList GetUserAgentBrandFullVersionListInternal(
      std::optional<blink::UserAgentBrandVersion> additional_brand_version) {

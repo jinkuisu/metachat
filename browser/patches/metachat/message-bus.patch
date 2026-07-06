@@ -180,7 +180,7 @@ diff --git a/chrome/browser/ui/webui/metachat/message_bus.cc b/chrome/browser/ui
 new file mode 100644
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/message_bus.cc
-@@ -0,0 +1,176 @@
+@@ -0,0 +1,178 @@
 +// MetaChat: Message bus - WebUI - C++ bidirectional communication
 +// Copyright 2025 The MetaChat Authors. All rights reserved.
 +

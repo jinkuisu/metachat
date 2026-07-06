@@ -16,7 +16,7 @@ diff --git a/net/base/features.cc b/net/base/features.cc
 index 98b21d5fad16d..0905678103038 100644
 --- a/net/base/features.cc
 +++ b/net/base/features.cc
-@@ -613,7 +613,15 @@ BASE_FEATURE(kRestrictAbusePortsOnLocalhost, base::FEATURE_ENABLED_BY_DEFAULT);
+@@ -607,7 +607,15 @@ BASE_FEATURE(kRestrictAbusePortsOnLocalhost, base::FEATURE_ENABLED_BY_DEFAULT);
  
  BASE_FEATURE(kTLSTrustAnchorIDs, base::FEATURE_DISABLED_BY_DEFAULT);
  
