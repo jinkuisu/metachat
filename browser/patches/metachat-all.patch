@@ -2568,6 +2568,780 @@ index 0000000000000..0c7393899da57
 +}  // namespace ai_agent
 +
 +#endif  // CHROME_BROWSER_AI_AGENT_PAGE_SERIALIZER_H_
+diff --git a/chrome/browser/app_controller_mac.mm b/chrome/browser/app_controller_mac.mm
+index ae5df201946d0..7a58dbc28acb3 100644
+--- a/chrome/browser/app_controller_mac.mm
++++ b/chrome/browser/app_controller_mac.mm
+@@ -911,6 +911,9 @@ class AppControllerProfileObserver : public ProfileAttributesStorage::Observer,
+ 
+   // Initialize the Profile menu.
+   [self initProfileMenu];
++
++  // Lightweight-fork: drop top-level History/Bookmarks/Help menus.
++  [self lightweightForkPruneMenuBar];
+ }
+ 
+ - (void)unregisterEventHandlers {
+@@ -1901,6 +1904,17 @@ class AppControllerProfileObserver : public ProfileAttributesStorage::Observer,
+   NSMenu* mainMenu = [NSApp mainMenu];
+   NSMenuItem* profileMenu = [mainMenu itemWithTag:IDC_PROFILE_MAIN_MENU];
+ 
++  // Lightweight-fork (FINGERPRINT_ISOLATION_PLAN.md task #7 / Phase 6b):
++  // unconditionally remove the Profile menu. No multi-profile UI in this
++  // fork; IsLightweightForkBlockedCommand already blocks every profile
++  // command at the controller level, but the Cocoa menu bar is a separate
++  // construction path.
++  if (profileMenu) {
++    [mainMenu removeItem:profileMenu];
++  }
++  return;
++  // Original path preserved below for upstream-merge reference.
++  /*
+   if (!profiles::IsMultipleProfilesEnabled()) {
+     [mainMenu removeItem:profileMenu];
+     return;
+@@ -1911,6 +1925,39 @@ class AppControllerProfileObserver : public ProfileAttributesStorage::Observer,
+ 
+   _profileMenuController =
+       [[ProfileMenuController alloc] initWithMainMenuItem:profileMenu];
++  */
++}
++
++// Lightweight-fork: hide History, Bookmarks, and Help top-level menus.
++// Items inside these would already be greyed out by
++// IsLightweightForkBlockedCommand, but the menus themselves remain visible
++// in the Cocoa menu bar until hidden here. We HIDE rather than remove
++// because BookmarkMenuBridge / HistoryMenuBridge construct themselves
++// against the NSMenu instance on every profile load and CHECK that the
++// menu exists (see bookmark_menu_bridge.mm CHECK(menu_root_)). Hiding
++// preserves the menu instance while removing it from the visible menu bar.
++// Called from -mainMenuCreated, after the standard menu bar is constructed.
++- (void)lightweightForkPruneMenuBar {
++  NSMenu* mainMenu = [NSApp mainMenu];
++  for (NSInteger tag : (NSInteger[]){
++           IDC_HISTORY_MENU,
++           IDC_BOOKMARKS_MENU,
++           IDC_HELP_MENU,
++       }) {
++    NSMenuItem* item = [mainMenu itemWithTag:tag];
++    if (item) {
++      [item setHidden:YES];
++    }
++  }
++  // macOS injects a top-bar Help menu via NSApplication.helpMenu — not
++  // tagged with IDC_HELP_MENU (that's the in-window submenu). Clear it
++  // and hide any remaining "Help" item by title.
++  NSApp.helpMenu = nil;
++  for (NSMenuItem* item in mainMenu.itemArray) {
++    if ([item.title isEqualToString:@"Help"]) {
++      [item setHidden:YES];
++    }
++  }
+ }
+ 
+ - (void)initShareMenu {
+diff --git a/chrome/browser/resources/actor_overlay/app.css b/chrome/browser/resources/actor_overlay/app.css
+index 3b47d0722866f..4e23be090bc59 100644
+--- a/chrome/browser/resources/actor_overlay/app.css
++++ b/chrome/browser/resources/actor_overlay/app.css
+@@ -169,3 +169,42 @@ reduced motion */
+ .clicking {
+   animation: cursor-click 400ms ease-out;
+ }
++
++/*
++ * Red CLICK RIPPLE. Emanates from the cursor's hotspot (the element origin,
++ * which is translated to the click point) the moment a click lands, so the red
++ * indicator is co-located with the cursor on arrival -- replacing the fork's
++ * old in-page red dot that was placed early and raced ahead of the glide.
++ */
++#clickRipple {
++  position: absolute;
++  left: 0;
++  top: 0;
++  width: 20px;
++  height: 20px;
++  margin: -10px 0 0 -10px;
++  border-radius: 50%;
++  background: rgba(255, 40, 40, 0.82);
++  border: 1.5px solid #fff;
++  opacity: 0;
++  pointer-events: none;
++  will-change: transform, opacity;
++}
++
++#magicCursor.clicking #clickRipple {
++  animation: cf-click-ripple 400ms ease-out;
++}
++
++@keyframes cf-click-ripple {
++  0% {
++    opacity: 0.9;
++    transform: scale(0.35);
++  }
++  60% {
++    opacity: 0.5;
++  }
++  100% {
++    opacity: 0;
++    transform: scale(2.6);
++  }
++}
+diff --git a/chrome/browser/resources/actor_overlay/app.html.ts b/chrome/browser/resources/actor_overlay/app.html.ts
+index e749ea72e176a..a08f51404a3c4 100644
+--- a/chrome/browser/resources/actor_overlay/app.html.ts
++++ b/chrome/browser/resources/actor_overlay/app.html.ts
+@@ -15,6 +15,7 @@ export function getHtml(this: ActorOverlayAppElement) {
+ </div>
+ <div id="magicCursor">
+   <div id="cursorImage"></div>
++  <div id="clickRipple"></div>
+ </div>
+ <!--_html_template_end_-->`;
+   // clang-format on
+diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
+index e15713f1c9543..d251c656c767c 100644
+--- a/chrome/browser/ui/BUILD.gn
++++ b/chrome/browser/ui/BUILD.gn
+@@ -288,6 +288,7 @@ static_library("ui") {
+     ":url_identity",
+     "//base",
+     "//base:i18n",
++    "//chrome/browser/ai_agent",
+     "//base/allocator:buildflags",
+     "//build:android_buildflags",
+     "//build:branding_buildflags",
+diff --git a/chrome/browser/ui/browser.cc b/chrome/browser/ui/browser.cc
+index 829029ee3fa85..7b77faaf1c9f6 100644
+--- a/chrome/browser/ui/browser.cc
++++ b/chrome/browser/ui/browser.cc
+@@ -39,6 +39,7 @@
+ #include "chrome/browser/actor/actor_keyed_service.h"
+ #include "chrome/browser/actor/actor_util.h"
+ #include "chrome/browser/actor/execution_engine.h"
++#include "chrome/browser/ai_agent/agent_controller.h"
+ #include "chrome/browser/ai/ai_data_keyed_service.h"          // nogncheck
+ #include "chrome/browser/ai/ai_data_keyed_service_factory.h"  // nogncheck
+ #include "chrome/browser/app_mode/app_mode_utils.h"
+@@ -2791,6 +2792,20 @@ void Browser::GetAIPageContent(
+       }).Then(std::move(callback)));
+ }
+ 
++void Browser::RunAgentTask(
++    content::WebContents* web_contents,
++    const std::string& goal,
++    int max_steps,
++    const std::string& model,
++    const std::string& plan_json,
++    base::OnceCallback<void(bool success,
++                            const std::string& final_text,
++                            const std::string& steps_json)>
++        callback) {
++  ai_agent::AgentController::Start(web_contents, goal, max_steps, model,
++                                   plan_json, std::move(callback));
++}
++
+ #if BUILDFLAG(ENABLE_PRINTING)
+ void Browser::PrintCrossProcessSubframe(
+     content::WebContents* web_contents,
+diff --git a/chrome/browser/ui/browser.h b/chrome/browser/ui/browser.h
+index f99921ebc6e41..8a76519f62992 100644
+--- a/chrome/browser/ui/browser.h
++++ b/chrome/browser/ui/browser.h
+@@ -968,6 +968,16 @@ class Browser : public TabStripModelObserver,
+       content::WebContents* web_contents,
+       bool include_actionable_elements,
+       base::OnceCallback<void(const std::string&)> callback) override;
++  void RunAgentTask(
++      content::WebContents* web_contents,
++      const std::string& goal,
++      int max_steps,
++      const std::string& model,
++      const std::string& plan_json,
++      base::OnceCallback<void(bool success,
++                              const std::string& final_text,
++                              const std::string& steps_json)>
++          callback) override;
+ 
+ #if BUILDFLAG(ENABLE_PRINTING)
+   void PrintCrossProcessSubframe(
+diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
+index e061d34f1404d..540961da27cab 100644
+--- a/chrome/browser/ui/browser_command_controller.cc
++++ b/chrome/browser/ui/browser_command_controller.cc
+@@ -4,6 +4,7 @@
+ 
+ #include "chrome/browser/ui/browser_command_controller.h"
+ 
++#include "base/logging.h"
+ #include <stddef.h>
+ 
+ #include <algorithm>
+@@ -222,6 +223,109 @@ void AppInfoDialogClosedCallback(SessionID session_id,
+   }
+ }
+ 
++bool IsLightweightForkBlockedCommand(int id) {
++  switch (id) {
++    // Host/file integration.
++    case IDC_OPEN_FILE:
++    case IDC_SAVE_PAGE:
++    case IDC_PRINT:
++#if BUILDFLAG(ENABLE_PRINTING)
++    case IDC_BASIC_PRINT:
++#endif
++    // Bookmarks, history, downloads, reading list, and recent tabs UI.
++    case IDC_BOOKMARK_THIS_TAB:
++    case IDC_BOOKMARK_ALL_TABS:
++    case IDC_BOOKMARKS_MENU:
++    case IDC_SHOW_BOOKMARK_BAR:
++    case IDC_SHOW_BOOKMARK_MANAGER:
++    case IDC_SHOW_BOOKMARK_SIDE_PANEL:
++    case IDC_SHOW_HISTORY:
++    case IDC_SHOW_HISTORY_SIDE_PANEL:
++    case IDC_SHOW_HISTORY_CLUSTERS_SIDE_PANEL:
++    case IDC_SHOW_DOWNLOADS:
++    case IDC_RECENT_TABS_MENU:
++    case IDC_RECENT_TABS_LOGIN_FOR_DEVICE_TABS:
++    case IDC_RECENT_TABS_SEE_DEVICE_TABS:
++    case IDC_READING_LIST_MENU:
++    case IDC_READING_LIST_MENU_ADD_TAB:
++    case IDC_READING_LIST_MENU_SHOW_UI:
++    // Settings, help, feedback, profile, sync, and account surfaces.
++    case IDC_OPTIONS:
++    case IDC_PERFORMANCE:
++    case IDC_IMPORT_SETTINGS:
++    case IDC_CLEAR_BROWSING_DATA:
++    case IDC_ABOUT:
++    case IDC_HELP_MENU:
++    case IDC_HELP_PAGE_VIA_KEYBOARD:
++    case IDC_HELP_PAGE_VIA_MENU:
++    case IDC_FEEDBACK:
++    case IDC_SHOW_AVATAR_MENU:
++    case IDC_PROFILE_MENU_IN_APP_MENU:
++    case IDC_CLOSE_PROFILE:
++    case IDC_MANAGE_GOOGLE_ACCOUNT:
++    case IDC_OPEN_GUEST_PROFILE:
++    case IDC_ADD_NEW_PROFILE:
++    case IDC_MANAGE_CHROME_PROFILES:
++    case IDC_SHOW_SYNC_SETTINGS:
++    case IDC_SHOW_SYNC_PASSPHRASE_DIALOG:
++    case IDC_TURN_ON_SYNC:
++    case IDC_SHOW_SIGNIN:
++    case IDC_SHOW_SIGNIN_WHEN_PAUSED:
++    // Extensions and Chrome Web Store UI.
++    case IDC_MANAGE_EXTENSIONS:
++    case IDC_SAFETY_HUB_MANAGE_EXTENSIONS:
++    case IDC_EXTENSIONS_SUBMENU_MANAGE_EXTENSIONS:
++    case IDC_EXTENSIONS_SUBMENU_VISIT_CHROME_WEB_STORE:
++    // Password manager, payments, autofill, safety hub, sharing, side panels.
++    case IDC_PASSWORDS_AND_AUTOFILL_MENU:
++    case IDC_SHOW_PASSWORD_MANAGER:
++    case IDC_MANAGE_PASSWORDS_FOR_PAGE:
++    case IDC_SAFETY_HUB_SHOW_PASSWORD_CHECKUP:
++    case IDC_SHOW_PAYMENT_METHODS:
++    case IDC_SHOW_ADDRESSES:
++    case IDC_SHOW_CONTACT_INFO:
++    case IDC_SHOW_IDENTITY_DOCS:
++    case IDC_SHOW_TRAVEL:
++    case IDC_CONTENT_CONTEXT_SHARING_SUBMENU:
++    case IDC_SHARING_HUB:
++    case IDC_SHARING_HUB_SCREENSHOT:
++    case IDC_SEND_TAB_TO_SELF:
++    case IDC_QRCODE_GENERATOR:
++    case IDC_SHOW_COMMENTS_SIDE_PANEL:
++    case IDC_SHOW_READING_MODE_SIDE_PANEL:
++    case IDC_SHOW_READING_MODE_KEYBOARD:
++    case IDC_SHOW_CUSTOMIZE_CHROME_SIDE_PANEL:
++    case IDC_SHOW_CUSTOMIZE_CHROME_TOOLBAR:
++    case IDC_CUSTOMIZE_CHROME:
++    case IDC_SHOW_CHROME_LABS:
++    case IDC_SHOW_MANAGEMENT_PAGE:
++    // Translation surfaces (UI + context menu offers).
++    case IDC_SHOW_TRANSLATE:
++    case IDC_CONTENT_CONTEXT_TRANSLATE:
++    case IDC_CONTENT_CONTEXT_PARTIAL_TRANSLATE:
++    // Casting / media routing.
++    case IDC_ROUTE_MEDIA:
++    // Live caption (downloads SODA model; telemetry-adjacent).
++    case IDC_LIVE_CAPTION:
++    // Web-app install and PWA management surfaces.
++    case IDC_INSTALL_PWA:
++    case IDC_CREATE_SHORTCUT:
++    case IDC_OPEN_IN_PWA_WINDOW:
++    case IDC_WEB_APP_SETTINGS:
++    case IDC_WEB_APP_MENU_APP_INFO:
++    case IDC_WEB_APP_UPGRADE_DIALOG:
++    // Update / what's-new / tips surfaces.
++    case IDC_UPGRADE_DIALOG:
++    case IDC_CHROME_WHATS_NEW:
++    case IDC_CHROME_TIPS:
++    // Password manager additional entry point.
++    case IDC_VIEW_PASSWORDS:
++      return true;
++    default:
++      return false;
++  }
++}
++
+ bool CanOpenFile(Browser* browser) {
+   if (browser->is_type_devtools() || browser->is_type_app() ||
+       browser->is_type_app_popup()) {
+@@ -583,15 +687,26 @@ void BrowserCommandController::ShowCustomizeChromeSidePanel(
+ // BrowserCommandController, CommandUpdater implementation:
+ 
+ bool BrowserCommandController::SupportsCommand(int id) const {
++  if (IsLightweightForkBlockedCommand(id)) {
++    return false;
++  }
+   return command_updater_.SupportsCommand(id);
+ }
+ 
+ bool BrowserCommandController::IsCommandEnabled(int id) const {
++  if (IsLightweightForkBlockedCommand(id)) {
++    return false;
++  }
+   return command_updater_.IsCommandEnabled(id);
+ }
+ 
+ bool BrowserCommandController::ExecuteCommand(int id,
+                                               base::TimeTicks time_stamp) {
++  if (IsLightweightForkBlockedCommand(id)) {
++    // MetaChat: DVLOG - log blocked command
++    DVLOG(1) << "MetaChat: blocked command ID=" << id;
++    return false;
++  }
+   return ExecuteCommandWithDisposition(id, WindowOpenDisposition::CURRENT_TAB,
+                                        time_stamp);
+ }
+@@ -600,6 +715,11 @@ bool BrowserCommandController::ExecuteCommandWithDisposition(
+     int id,
+     WindowOpenDisposition disposition,
+     base::TimeTicks time_stamp) {
++  if (IsLightweightForkBlockedCommand(id)) {
++    // MetaChat: DVLOG - log blocked command
++    DVLOG(1) << "MetaChat: blocked command ID=" << id;
++    return false;
++  }
+   // Doesn't go through the command_updater_ to avoid dealing with having a
+   // naming collision for ExecuteCommandWithDisposition (both
+   // CommandUpdaterDelegate and CommandUpdater declare this function so we
+diff --git a/chrome/browser/ui/read_anything/read_anything_entry_point_controller.cc b/chrome/browser/ui/read_anything/read_anything_entry_point_controller.cc
+index 26feac287c1f6..e3d8dbfa60403 100644
+--- a/chrome/browser/ui/read_anything/read_anything_entry_point_controller.cc
++++ b/chrome/browser/ui/read_anything/read_anything_entry_point_controller.cc
+@@ -340,6 +340,9 @@ void ReadAnythingEntryPointController::UpdatePageActionVisibility(
+     tabs::TabInterface* tab,
+     base::OnceCallback<void(user_education::FeaturePromoResult promo_result)>
+         show_promo_callback) {
++  // Lightweight-fork: utility browser — Reading Mode omnibox chip never shown.
++  return;
++#if 0
+   if (!base::FeatureList::IsEnabled(features::kPageActionsMigration) ||
+       !features::IsReadAnythingOmniboxChipEnabled() || !tab) {
+     return;
+@@ -384,6 +387,7 @@ void ReadAnythingEntryPointController::UpdatePageActionVisibility(
+         feature_engagement::kIPHReadingModePageActionLabelFeature);
+   }
+   page_action_controller->Hide(kActionSidePanelShowReadAnything);
++#endif  // 0 — end lightweight-fork dead-code wrap
+ }
+ 
+ // static
+diff --git a/chrome/browser/ui/startup/bad_flags_prompt.cc b/chrome/browser/ui/startup/bad_flags_prompt.cc
+index 0deb93f45504c..47fc835cc2dde 100644
+--- a/chrome/browser/ui/startup/bad_flags_prompt.cc
++++ b/chrome/browser/ui/startup/bad_flags_prompt.cc
+@@ -121,10 +121,15 @@ const char* const kBadFlags[] = {
+     switches::kEnableSpeechDispatcher,
+ #endif
+ 
+-    // These flags control Blink feature state, which is not supported and is
+-    // intended only for use by Chromium developers.
+-    switches::kDisableBlinkFeatures,
+-    switches::kEnableBlinkFeatures,
++    // Lightweight-fork: --disable-blink-features and --enable-blink-features
++    // are intentionally part of this fork's startup flag set
++    // (FINGERPRINT_ISOLATION_PLAN.md Phase 3 + launch_lean.sh
++    // BLINK_DISABLE_FEATURES). Suppress the "unsupported command-line flag"
++    // infobar for these specifically — every OTHER entry in kBadFlags
++    // (e.g. --no-sandbox, --disable-web-security, --ignore-certificate-errors)
++    // still warns as intended.
++    // switches::kDisableBlinkFeatures,
++    // switches::kEnableBlinkFeatures,
+ 
+     // This flag allows people to allowlist certain origins as secure, even
+     // if they are not.
+@@ -252,6 +257,12 @@ void ShowBadFlagsInfoBarHelper(content::WebContents* web_contents,
+ }  // namespace
+ 
+ void ShowBadFlagsPrompt(content::WebContents* web_contents) {
++  // Lightweight-fork: suppress ALL "unsupported command-line flag" warning
++  // infobars. The fork deliberately launches with --enable-unsafe-webgpu (so
++  // navigator.gpu is exposed) and --disable-actor-safety-checks (agent), and
++  // the banner is a visible tell that shifts the viewport. No-op early return;
++  // kBadFlags is left intact for upstream-merge reference.
++  return;
+ // On Android, ShowBadFlagsPrompt doesn't show the warning notification
+ // for flags which are not available in about:flags.
+ #if !BUILDFLAG(IS_ANDROID)
+diff --git a/chrome/browser/ui/startup/infobar_utils.cc b/chrome/browser/ui/startup/infobar_utils.cc
+index 4907b9a951040..27d7e2ae0f986 100644
+--- a/chrome/browser/ui/startup/infobar_utils.cc
++++ b/chrome/browser/ui/startup/infobar_utils.cc
+@@ -18,7 +18,6 @@
+ #include "chrome/browser/ui/startup/automation_infobar_delegate.h"
+ #include "chrome/browser/ui/startup/bad_flags_prompt.h"
+ #include "chrome/browser/ui/startup/bidding_and_auction_consented_debugging_infobar_delegate.h"
+-#include "chrome/browser/ui/startup/google_api_keys_infobar_delegate.h"
+ #include "chrome/browser/ui/startup/obsolete_system_infobar_delegate.h"
+ #include "chrome/browser/ui/startup/oscryptasync_availability_infobar_delegate.h"
+ #include "chrome/browser/ui/startup/startup_browser_creator.h"
+@@ -29,7 +28,6 @@
+ #include "components/infobars/content/content_infobar_manager.h"
+ #include "components/prefs/pref_service.h"
+ #include "content/public/common/content_switches.h"
+-#include "google_apis/google_api_keys.h"
+ 
+ #if !BUILDFLAG(IS_CHROMEOS) && !BUILDFLAG(IS_ANDROID)
+ #include "chrome/browser/ui/startup/default_browser_prompt/default_browser_prompt.h"
+@@ -145,9 +143,13 @@ void AddInfoBarsIfNecessary(BrowserWindowInterface* browser,
+     return;
+   }
+ 
+-  // Web apps should not display the session restore bubble (crbug.com/40800614)
+-  const bool should_display_bubble =
+-      !is_web_app && HasPendingUncleanExit(browser->GetProfile());
++  // Lightweight-fork: never surface the "Restore pages? <browser> didn't shut
++  // down correctly" session-restore bubble. Every launch is treated as clean
++  // so this crash-restore UI is suppressed unconditionally.
++  // Original upstream logic preserved for upstream-merge reference:
++  //   const bool should_display_bubble =
++  //       !is_web_app && HasPendingUncleanExit(browser->GetProfile());
++  const bool should_display_bubble = false;
+   base::UmaHistogramBoolean("Startup.CrashBubbleShown", should_display_bubble);
+   if (should_display_bubble) {
+     SessionCrashedBubble::ShowIfNotOffTheRecordProfile(
+@@ -185,9 +187,11 @@ void AddInfoBarsIfNecessary(BrowserWindowInterface* browser,
+   infobars::ContentInfoBarManager* infobar_manager =
+       infobars::ContentInfoBarManager::FromWebContents(web_contents);
+ 
+-  if (!google_apis::HasAPIKeyConfigured()) {
+-    GoogleApiKeysInfoBarDelegate::Create(infobar_manager);
+-  }
++  // Lightweight-fork: suppress "Google API keys are missing" infobar.
++  // Utility browser doesn't use any Google API services.
++  // if (!google_apis::HasAPIKeyConfigured()) {
++  //   GoogleApiKeysInfoBarDelegate::Create(infobar_manager);
++  // }
+ 
+   if (ObsoleteSystem::IsObsoleteNowOrSoon()) {
+     PrefService* local_state = g_browser_process->local_state();
+diff --git a/chrome/browser/ui/toolbar/app_menu_model.cc b/chrome/browser/ui/toolbar/app_menu_model.cc
+index 196c09329841a..01fe742f0037c 100644
+--- a/chrome/browser/ui/toolbar/app_menu_model.cc
++++ b/chrome/browser/ui/toolbar/app_menu_model.cc
+@@ -240,7 +240,7 @@ void AddSubMenuWithStringIdAndVectorIcon(ui::SimpleMenuModel* model,
+ 
+ // Conditionally return the update app menu item title based on upgrade detector
+ // state.
+-std::u16string GetUpgradeDialogTitleText() {
++[[maybe_unused]] std::u16string GetUpgradeDialogTitleText() {
+   if (UpgradeDetector::GetInstance()->is_outdated_install() ||
+       UpgradeDetector::GetInstance()->is_outdated_install_no_au()) {
+     return l10n_util::GetStringUTF16(IDS_UPGRADE_BUBBLE_MENU_ITEM);
+@@ -894,7 +894,7 @@ SaveAndShareSubMenuModel::SaveAndShareSubMenuModel(
+   }
+ }
+ 
+-bool ArePromotionsEnabled() {
++[[maybe_unused]] bool ArePromotionsEnabled() {
+   PrefService* local_state = g_browser_process->local_state();
+   return local_state && local_state->GetBoolean(prefs::kPromotionsEnabled);
+ }
+@@ -1930,22 +1930,16 @@ void AppMenuModel::LogMenuAction(AppMenuAction action_id) {
+ // - Learn about the browser and global customisation e.g. settings, help.
+ // - Browser relaunch, quit.
+ void AppMenuModel::Build() {
+-  // Build (and, by extension, Init) should only be called once.
++  // Lightweight-fork: empty app menu. Utility browser — all functionality is
++  // via keyboard shortcuts (Cmd+T new tab, Cmd+N new window, Cmd+Q quit,
++  // Cmd+F find, Cmd+P print) and the custom IPC. The menu button itself is
++  // hidden elsewhere; this Build() runs no-op as defense-in-depth.
+   DCHECK_EQ(0u, GetItemCount());
++  uma_action_recorded_ = false;
++  return;  // Skip the original (huge) Build body below.
+ 
+-  if (app_menu_icon_controller_ &&
+-      app_menu_icon_controller_->GetTypeAndSeverity().type ==
+-          AppMenuIconController::IconType::kUpgradeNotification) {
+-    AddSeparator(ui::SPACING_SEPARATOR);
+-    const auto update_icon = ui::ImageModel::FromVectorIcon(
+-        kBrowserToolsUpdateChromeRefreshOldIcon,
+-        ui::kColorMenuIconOnEmphasizedBackground, kDefaultIconSize);
+-    if (browser_defaults::kShowUpgradeMenuItem) {
+-      AddItemWithIcon(IDC_UPGRADE_DIALOG, GetUpgradeDialogTitleText(),
+-                      update_icon);
+-      AddSeparator(ui::SPACING_SEPARATOR);
+-    }
+-  }
++  // ====== Original full body retained below but unreachable. ======
++#if 0  // Lightweight-fork: original body kept for diff reference only.
+ 
+   if (AddSafetyHubMenuItem() || AddGlobalErrorMenuItems() ||
+       AddDefaultBrowserMenuItems()) {
+@@ -2191,6 +2185,7 @@ void AppMenuModel::Build() {
+ #endif  // !BUILDFLAG(IS_CHROMEOS)
+ 
+   uma_action_recorded_ = false;
++#endif  // 0 — end of lightweight-fork unreachable original Build() body
+ }
+ 
+ void AppMenuModel::CreateCutCopyPasteMenu() {
+diff --git a/chrome/browser/ui/views/bookmarks/bookmark_page_action_controller.cc b/chrome/browser/ui/views/bookmarks/bookmark_page_action_controller.cc
+index 1388bf93a47c4..c2e4ba2a2f11c 100644
+--- a/chrome/browser/ui/views/bookmarks/bookmark_page_action_controller.cc
++++ b/chrome/browser/ui/views/bookmarks/bookmark_page_action_controller.cc
+@@ -28,15 +28,6 @@
+ #include "ui/base/l10n/l10n_util.h"
+ #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
+ 
+-namespace {
+-
+-bool IsNTPUrl(const GURL& url) {
+-  return url == chrome::ChromeUINewTabURLAsGURL() ||
+-         url == chrome::ChromeUINewTabPageURLAsGURL();
+-}
+-
+-}  // namespace
+-
+ DEFINE_USER_DATA(BookmarkPageActionController);
+ 
+ BookmarkPageActionController::BookmarkPageActionController(
+@@ -127,9 +118,8 @@ void BookmarkPageActionController::UpdatePageActionVisibility() {
+ }
+ 
+ bool BookmarkPageActionController::ShouldShowPageAction() const {
+-  const auto& url = tab().GetContents()->GetLastCommittedURL();
+-  return browser_defaults::bookmarks_enabled &&
+-         edit_bookmarks_enabled_.GetValue() && url.is_valid() && !IsNTPUrl(url);
++  // Lightweight-fork: utility browser — bookmark star never shown.
++  return false;
+ }
+ 
+ void BookmarkPageActionController::SetStarred(bool starred) {
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+index 787771d2e8fcb..b8c6954de99b4 100644
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -5125,6 +5125,9 @@ ContentsLayoutManager* BrowserView::GetContentsLayoutManager() const {
+ }
+ 
+ bool BrowserView::MaybeShowBookmarkBar(WebContents* contents) {
++  // Lightweight-fork: utility browser — never show the bookmarks bar.
++  return false;
++#if 0  // Original body retained for diff reference.
+   const bool show_bookmark_bar =
+       contents && browser_->SupportsWindowFeature(
+                       Browser::WindowFeature::kFeatureBookmarkBar);
+@@ -5168,6 +5171,7 @@ bool BrowserView::MaybeShowBookmarkBar(WebContents* contents) {
+   }
+ 
+   return needs_layout;
++#endif  // 0 — end lightweight-fork dead-code wrap
+ }
+ 
+ bool BrowserView::MaybeShowInfoBar(WebContents* contents) {
+diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.cc b/chrome/browser/ui/views/location_bar/location_bar_view.cc
+index ef701ccfec136..6d9f62c6f3ce0 100644
+--- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
++++ b/chrome/browser/ui/views/location_bar/location_bar_view.cc
+@@ -331,6 +331,10 @@ void LocationBarView::Init() {
+       std::make_unique<LocationIconView>(omnibox_chip_font_list, this, this);
+   location_icon_view->set_drag_controller(this);
+   location_icon_view_ = AddChildView(std::move(location_icon_view));
++  // Lightweight-fork: utility browser — hide the page-info / tune icon
++  // (popover with Connection/Cookies/Site settings). Keep the view to satisfy
++  // internal pointer references; just make it invisible.
++  location_icon_view_->SetVisible(false);
+ 
+   if (page_info::IsMerchantTrustFeatureEnabled() &&
+       page_info::kMerchantTrustEnableOmniboxChip.Get()) {
+@@ -568,9 +572,10 @@ void LocationBarView::Init() {
+                                 PageActionIconType::kAiMode);
+   }
+ 
+-  if (browser_ && !is_popup_mode_) {
+-    params.types_enabled.push_back(PageActionIconType::kBookmarkStar);
+-  }
++  // Lightweight-fork: utility browser — no bookmark star (no bookmarks UI).
++  // if (browser_ && !is_popup_mode_) {
++  //   params.types_enabled.push_back(PageActionIconType::kBookmarkStar);
++  // }
+ 
+   params.icon_color = color_provider->GetColor(kColorOmniboxActionIcon);
+   params.between_icon_spacing = kBetweenIconSpacing;
+@@ -962,18 +967,9 @@ void LocationBarView::Layout(PassKey) {
+       }
+       selected_keyword_view_->SetCustomImage(image);
+     }
+-  } else if (location_icon_view_->GetShowText() &&
+-             !ShouldChipOverrideLocationIcon()) {
+-    location_icon_view_->SetVisible(true);
+-    leading_decorations.AddDecoration(
+-        vertical_padding, location_height, false, kLeadingDecorationMaxFraction,
+-        /*intra_item_padding=*/0, icon_left, location_icon_view_);
+-  } else if (!ShouldChipOverrideLocationIcon()) {
+-    location_icon_view_->SetVisible(true);
+-    leading_decorations.AddDecoration(vertical_padding, location_height, false,
+-                                      0, /*intra_item_padding=*/0, icon_left,
+-                                      location_icon_view_);
+   } else {
++    // Lightweight-fork: utility browser — never show the page-info /
++    // location icon (the lock / tune / chip on the left of the omnibox).
+     location_icon_view_->SetVisible(false);
+   }
+ 
+diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
+index a45396e6e3db3..95dc7b5c98613 100644
+--- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
++++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
+@@ -579,22 +579,8 @@ void ToolbarView::Init() {
+   if (!features::IsWebUIAvatarButtonEnabled()) {
+     avatar_ =
+         AddChildView(std::make_unique<AvatarToolbarButton>(browser_view_));
+-    bool show_avatar_toolbar_button = true;
+-#if BUILDFLAG(IS_CHROMEOS)
+-    // ChromeOS only badges Incognito, Guest, and captive portal signin icons in
+-    // the browser window.
+-    show_avatar_toolbar_button =
+-        browser_->profile()->IsIncognitoProfile() ||
+-        browser_->profile()->IsGuestSession() ||
+-        (browser_->profile()->IsOffTheRecord() &&
+-         browser_->profile()->GetOTRProfileID().IsCaptivePortal());
+-#else
+-    // DevTools profiles are OffTheRecord, so hide it there.
+-    show_avatar_toolbar_button = browser_->profile()->IsIncognitoProfile() ||
+-                                 browser_->profile()->IsGuestSession() ||
+-                                 browser_->profile()->IsRegularProfile();
+-#endif
+-    avatar_->SetVisible(show_avatar_toolbar_button);
++    // Lightweight-fork: utility browser — no profile/identity UI ever.
++    avatar_->SetVisible(false);
+   }
+ 
+   overflow_button_ = AddChildView(std::make_unique<OverflowButton>());
+@@ -608,6 +594,10 @@ void ToolbarView::Init() {
+       l10n_util::GetStringUTF16(IDS_APPMENU_TOOLTIP));
+   app_menu_button->SetID(VIEW_ID_APP_MENU);
+   app_menu_button_ = AddChildView(std::move(app_menu_button));
++  // Lightweight-fork: hide the 3-dot menu button entirely. Keep the pointer
++  // alive (lots of code references it for focus / accessibility), just make
++  // it invisible.
++  app_menu_button_->SetVisible(false);
+ 
+   if (base::FeatureList::IsEnabled(contextual_tasks::kContextualTasks) &&
+       contextual_tasks::GetExpandButtonOption() ==
+diff --git a/chrome/browser/ui/webui/chrome_web_ui_configs.cc b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
+index 76fa678e056b4..b20e7bde7c94c 100644
+--- a/chrome/browser/ui/webui/chrome_web_ui_configs.cc
++++ b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
+@@ -8,6 +8,7 @@
+ #include "build/branding_buildflags.h"
+ #include "build/build_config.h"
+ #include "chrome/browser/contextual_tasks/contextual_tasks_ui.h"
++#include "chrome/browser/ui/webui/metachat/metachat_ui.h"
+ #include "chrome/browser/glic/host/glic_ui.h"
+ #include "chrome/browser/optimization_guide/optimization_guide_internals_ui.h"
+ #include "chrome/browser/ui/webui/about/about_ui.h"
+@@ -294,11 +295,13 @@ void RegisterChromeWebUIConfigs() {
+           security_interstitials::KnownInterceptionDisclosureUIConfig>());
+   map.AddWebUIConfig(std::make_unique<SavedTabGroupsUnsupportedUIConfig>());
+   map.AddWebUIConfig(std::make_unique<SegmentationInternalsUIConfig>());
+-  map.AddWebUIConfig(std::make_unique<SignInInternalsUIConfig>());
++  // Lightweight-fork: signin/sync internals dropped — no signin/sync in
++  // this fork, so the internals pages have nothing to show.
++  // map.AddWebUIConfig(std::make_unique<SignInInternalsUIConfig>());
+   map.AddWebUIConfig(std::make_unique<
+                      subresource_filter::SubresourceFilterInternalsUIConfig>());
+   map.AddWebUIConfig(std::make_unique<SiteEngagementUIConfig>());
+-  map.AddWebUIConfig(std::make_unique<SyncInternalsUIConfig>());
++  // map.AddWebUIConfig(std::make_unique<SyncInternalsUIConfig>());
+   map.AddWebUIConfig(std::make_unique<TranslateInternalsUIConfig>());
+   map.AddWebUIConfig(std::make_unique<UsbInternalsUIConfig>());
+   map.AddWebUIConfig(std::make_unique<user_actions_ui::UserActionsUIConfig>());
+@@ -337,18 +340,26 @@ void RegisterChromeWebUIConfigs() {
+   map.AddWebUIConfig(std::make_unique<actor::ui::ActorOverlayUIConfig>());
+   map.AddWebUIConfig(std::make_unique<AppServiceInternalsUIConfig>());
+   map.AddWebUIConfig(std::make_unique<AutofillMlInternalsUIConfig>());
+-  map.AddWebUIConfig(std::make_unique<BookmarksSidePanelUIConfig>());
+-  map.AddWebUIConfig(std::make_unique<BookmarksUIConfig>());
++  // Lightweight-fork (FINGERPRINT_ISOLATION_PLAN.md task #7, WebUI-route
++  // closure): bookmarks/downloads/feedback/history are user-facing surfaces
++  // already blocked at command-level via IsLightweightForkBlockedCommand;
++  // dropping their WebUIConfig here also closes direct chrome:// URL
++  // navigation (otherwise typing the URL still resolves the page).
++  // map.AddWebUIConfig(std::make_unique<BookmarksSidePanelUIConfig>());
++  // map.AddWebUIConfig(std::make_unique<BookmarksUIConfig>());
+   map.AddWebUIConfig(std::make_unique<ColorPipelineInternalsUIConfig>());
+   map.AddWebUIConfig(std::make_unique<CommentsSidePanelUIConfig>());
+   map.AddWebUIConfig(std::make_unique<CustomizeChromeUIConfig>());
+-  map.AddWebUIConfig(std::make_unique<DownloadsUIConfig>());
++  // map.AddWebUIConfig(std::make_unique<DownloadsUIConfig>());
+   map.AddWebUIConfig(std::make_unique<DrivePickerHostUIConfig>());
+   map.AddWebUIConfig(std::make_unique<glic::GlicExperimentalOptInUIConfig>());
+-  map.AddWebUIConfig(std::make_unique<FeedbackUIConfig>());
+-  map.AddWebUIConfig(std::make_unique<HistoryUIConfig>());
+-  map.AddWebUIConfig(std::make_unique<HistorySidePanelUIConfig>());
+-  map.AddWebUIConfig(std::make_unique<HistoryClustersSidePanelUIConfig>());
++  // FeedbackUIConfig: chrome.send("showDialog") with --disable-features=
++  // Translate,MediaRouter,...  hits NOTREACHED in WebUIImpl, crashing the
++  // browser. Drop the config to fully close the route.
++  // map.AddWebUIConfig(std::make_unique<FeedbackUIConfig>());
++  // map.AddWebUIConfig(std::make_unique<HistoryUIConfig>());
++  // map.AddWebUIConfig(std::make_unique<HistorySidePanelUIConfig>());
++  // map.AddWebUIConfig(std::make_unique<HistoryClustersSidePanelUIConfig>());
+   map.AddWebUIConfig(std::make_unique<InfobarInternalsUIConfig>());
+   map.AddWebUIConfig(std::make_unique<InspectUIConfig>());
+ #if BUILDFLAG(ENABLE_SESSION_SERVICE)
+@@ -368,13 +379,17 @@ void RegisterChromeWebUIConfigs() {
+   map.AddWebUIConfig(std::make_unique<OmniboxPopupUIConfig>());
+   map.AddWebUIConfig(
+       std::make_unique<on_device_internals::OnDeviceInternalsUIConfig>());
+-  map.AddWebUIConfig(std::make_unique<PasswordManagerUIConfig>());
++  // Lightweight-fork: drop the password-manager WebUI host so direct URL
++  // navigation can't reach it. Command-level already blocked.
++  // map.AddWebUIConfig(std::make_unique<PasswordManagerUIConfig>());
+   map.AddWebUIConfig(
+       std::make_unique<private_ai::PrivateAiInternalsUIConfig>());
+   map.AddWebUIConfig(std::make_unique<ProfileInternalsUIConfig>());
+   map.AddWebUIConfig(std::make_unique<ReadingListUIConfig>());
+   map.AddWebUIConfig(std::make_unique<SearchEngineChoiceUIConfig>());
+-  map.AddWebUIConfig(std::make_unique<settings::SettingsUIConfig>());
++  // Lightweight-fork: chrome://settings disabled. Utility browser — no user-
++  // facing settings; configuration is via launch flags and the custom IPC.
++  // map.AddWebUIConfig(std::make_unique<settings::SettingsUIConfig>());
+   map.AddWebUIConfig(std::make_unique<ShoppingInsightsSidePanelUIConfig>());
+   map.AddWebUIConfig(std::make_unique<SuggestInternalsUIConfig>());
+   map.AddWebUIConfig(std::make_unique<SupportToolUIConfig>());
+@@ -441,7 +456,9 @@ void RegisterChromeWebUIConfigs() {
+ #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+     BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_DESKTOP_ANDROID)
+   map.AddWebUIConfig(std::make_unique<DiscardsUIConfig>());
+-  map.AddWebUIConfig(std::make_unique<ManagementUIConfig>());
++  // Lightweight-fork: chrome://management is for enterprise policy state,
++  // not relevant for this fork.
++  // map.AddWebUIConfig(std::make_unique<ManagementUIConfig>());
+ #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||
+         // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_DESKTOP_ANDROID)
+ 
+@@ -492,4 +509,6 @@ void RegisterChromeWebUIConfigs() {
+   map.AddWebUIConfig(std::make_unique<skills::SkillsUIConfig>());
+ #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+         // BUILDFLAG(IS_CHROMEOS)
++  // MetaChat: chrome://metachat/ - account management, plugin launcher
++  map.AddWebUIConfig(std::make_unique<MetaChatUIConfig>());
+ }
 diff --git a/chrome/browser/ui/webui/metachat/BUILD.gn b/chrome/browser/ui/webui/metachat/BUILD.gn
 new file mode 100644
 index 0000000000000..be988a35866f0
@@ -2592,16 +3366,562 @@ index 0000000000000..be988a35866f0
 +    "//content/public/browser",
 +  ]
 +}
-diff --git a/chrome/browser/ui/webui/metachat/message_bus.cc b/chrome/browser/ui/webui/metachat/message_bus.cc
+diff --git a/chrome/browser/ui/webui/metachat/account_store.cc b/chrome/browser/ui/webui/metachat/account_store.cc
 new file mode 100644
-index 0000000000000..fd31993cce742
+index 0000000000000..1970d97fc58c9
 --- /dev/null
-+++ b/chrome/browser/ui/webui/metachat/message_bus.cc
-@@ -0,0 +1,178 @@
-+// MetaChat: Message bus - WebUI - C++ bidirectional communication
++++ b/chrome/browser/ui/webui/metachat/account_store.cc
+@@ -0,0 +1,36 @@
++// Copyright 2025 The MetaChat Authors.
++#include "chrome/browser/ui/webui/metachat/account_store.h"
++#include "base/files/file_util.h"
++#include "base/json/json_reader.h"
++#include "base/json/json_writer.h"
++#include "base/logging.h"
++#include "chrome/browser/profiles/profile.h"
++namespace metachat {
++AccountStore::AccountStore(Profile* profile) : profile_(profile) {}
++base::FilePath AccountStore::GetPath() const {
++  return profile_->GetPath().Append(FILE_PATH_LITERAL("metachat")).Append(FILE_PATH_LITERAL("accounts.json"));
++}
++std::vector<Account> AccountStore::LoadFromFile(const base::FilePath& path) {
++  std::string json;
++  if (!base::ReadFileToString(path, &json)) return {};
++  auto parsed = base::JSONReader::Read(json);
++  if (!parsed || !parsed->is_list()) {
++    LOG(WARNING) << "AccountStore: invalid accounts.json";
++    return {};
++  }
++  return AccountListFromValue(parsed->GetList());
++}
++bool AccountStore::SaveToFile(const base::FilePath& path, const std::vector<Account>& accounts) {
++  base::CreateDirectory(path.DirName());
++  base::Value::List list = AccountListToValue(accounts);
++  std::string json;
++  base::JSONWriter::WriteWithOptions(list, base::JSONWriter::OPTIONS_PRETTY_PRINT, &json);
++  if (!base::WriteFile(path, json)) {
++    LOG(ERROR) << "AccountStore: failed to write " << path;
++    return false;
++  }
++  return true;
++}
++std::vector<Account> AccountStore::LoadAll() { return LoadFromFile(GetPath()); }
++bool AccountStore::SaveAll(const std::vector<Account>& accounts) { return SaveToFile(GetPath(), accounts); }
++}  // namespace metachat
+\ No newline at end of file
+diff --git a/chrome/browser/ui/webui/metachat/account_store.h b/chrome/browser/ui/webui/metachat/account_store.h
+new file mode 100644
+index 0000000000000..44a8cbc9a26fa
+--- /dev/null
++++ b/chrome/browser/ui/webui/metachat/account_store.h
+@@ -0,0 +1,25 @@
++// Copyright 2025 The MetaChat Authors.
++#ifndef CHROME_BROWSER_UI_WEBUI_METACHAT_ACCOUNT_STORE_H_
++#define CHROME_BROWSER_UI_WEBUI_METACHAT_ACCOUNT_STORE_H_
++#include <string>
++#include <vector>
++#include "base/files/file_path.h"
++#include "base/values.h"
++#include "chrome/browser/ui/webui/metachat/data_model.h"
++class Profile;
++namespace metachat {
++// AccountStore: JSON file-based CRUD.
++// File lives at profile->GetPath()/metachat/accounts.json
++class AccountStore {
++ public:
++  explicit AccountStore(Profile* profile);
++  static std::vector<Account> LoadFromFile(const base::FilePath& path);
++  static bool SaveToFile(const base::FilePath& path, const std::vector<Account>& accounts);
++  std::vector<Account> LoadAll();
++  bool SaveAll(const std::vector<Account>& accounts);
++  base::FilePath GetPath() const;
++ private:
++  Profile* profile_;
++};
++}  // namespace metachat
++#endif
+\ No newline at end of file
+diff --git a/chrome/browser/ui/webui/metachat/cdp_bridge.cc b/chrome/browser/ui/webui/metachat/cdp_bridge.cc
+new file mode 100644
+index 0000000000000..e0b0062d59042
+--- /dev/null
++++ b/chrome/browser/ui/webui/metachat/cdp_bridge.cc
+@@ -0,0 +1,43 @@
++// Copyright 2025 The MetaChat Authors.
++#include "chrome/browser/ui/webui/metachat/cdp_bridge.h"
++#include "base/logging.h"
++#include "base/json/json_reader.h"
++#include "base/json/json_writer.h"
++#include "base/strings/string_number_conversions.h"
++#include "content/public/browser/devtools_agent_host.h"
++#include "content/public/browser/web_contents.h"
++namespace metachat {
++CdpBridge::CdpBridge() = default;
++int CdpBridge::Attach(content::WebContents* web_contents) {
++  if (!web_contents) return -1;
++  attached_web_contents_ = web_contents;
++  // For MVP, we use an internal DevToolsAgentHost without starting a server.
++  // This allows SendCommand to work without exposing a TCP port.
++  port_ = 0;  // Attached internally
++  DVLOG(1) << "CdpBridge: attached to WebContents";
++  return port_;
++}
++void CdpBridge::Detach() {
++  attached_web_contents_ = nullptr;
++  port_ = -1;
++}
++base::Value::Dict CdpBridge::SendCommand(const std::string& method,
++                                          base::Value::Dict params) {
++  if (!attached_web_contents_) {
++    base::Value::Dict err;
++    err.Set("error", "not_attached");
++    return err;
++  }
++  auto host = content::DevToolsAgentHost::GetOrCreateFor(attached_web_contents_);
++  if (!host) {
++    base::Value::Dict err;
++    err.Set("error", "no_agent_host");
++    return err;
++  }
++  // DevToolsAgentHost::SendProtocolCommand dispatches to the page.
++  host->SendProtocolCommand(method, /*message_id=*/std::nullopt, std::move(params));
++  base::Value::Dict ok;
++  ok.Set("status", "sent");
++  return ok;
++}
++}  // namespace metachat
+\ No newline at end of file
+diff --git a/chrome/browser/ui/webui/metachat/cdp_bridge.h b/chrome/browser/ui/webui/metachat/cdp_bridge.h
+new file mode 100644
+index 0000000000000..05186982fff5c
+--- /dev/null
++++ b/chrome/browser/ui/webui/metachat/cdp_bridge.h
+@@ -0,0 +1,28 @@
++// Copyright 2025 The MetaChat Authors.
++#ifndef CHROME_BROWSER_UI_WEBUI_METACHAT_CDP_BRIDGE_H_
++#define CHROME_BROWSER_UI_WEBUI_METACHAT_CDP_BRIDGE_H_
++#include <string>
++#include "base/memory/raw_ptr.h"
++#include "base/values.h"
++namespace content { class WebContents; }
++namespace metachat {
++// CdpBridge: proxies CDP commands to a WebContents.
++// Uses content::DevToolsAgentHost for protocol execution.
++class CdpBridge {
++ public:
++  CdpBridge();
++  // Attach to a WebContents. Returns CDP port or -1 on failure.
++  int Attach(content::WebContents* web_contents);
++  // Detach from current WebContents.
++  void Detach();
++  // Send a CDP command. Returns result dict or error dict.
++  base::Value::Dict SendCommand(const std::string& method,
++                                base::Value::Dict params);
++  bool IsAttached() const { return port_ > 0; }
++  int port() const { return port_; }
++ private:
++  int port_ = -1;
++  content::WebContents* attached_web_contents_ = nullptr;
++};
++}  // namespace metachat
++#endif
+\ No newline at end of file
+diff --git a/chrome/browser/ui/webui/metachat/data_model.cc b/chrome/browser/ui/webui/metachat/data_model.cc
+new file mode 100644
+index 0000000000000..0332b19113ae3
+--- /dev/null
++++ b/chrome/browser/ui/webui/metachat/data_model.cc
+@@ -0,0 +1,164 @@
++// ... (data_model.cc content)
++#include "chrome/browser/ui/webui/metachat/data_model.h"
++#include <string>
++#include "base/rand_util.h"
++#include "base/strings/string_number_conversions.h"
++#include "base/time/time.h"
++namespace metachat {
++// --- FingerprintConfig ---
++base::Value::Dict FingerprintConfig::ToDict() const {
++  base::Value::Dict d;
++  if (!platform.empty()) d.Set("platform", platform);
++  if (!user_agent.empty()) d.Set("user_agent", user_agent);
++  if (!locale.empty()) d.Set("locale", locale);
++  if (!timezone.empty()) d.Set("timezone", timezone);
++  if (screen_width > 0) d.Set("screen_width", screen_width);
++  if (screen_height > 0) d.Set("screen_height", screen_height);
++  if (color_depth > 0) d.Set("color_depth", color_depth);
++  if (device_pixel_ratio > 0.0) d.Set("device_pixel_ratio", device_pixel_ratio);
++  if (device_memory > 0.0) d.Set("device_memory", device_memory);
++  if (hardware_concurrency > 0) d.Set("hardware_concurrency", hardware_concurrency);
++  if (!webgl_vendor.empty()) d.Set("webgl_vendor", webgl_vendor);
++  if (!webgl_renderer.empty()) d.Set("webgl_renderer", webgl_renderer);
++  d.Set("canvas_noise_enabled", canvas_noise_enabled);
++  d.Set("canvas_noise_level", canvas_noise_level);
++  d.Set("audio_noise_enabled", audio_noise_enabled);
++  d.Set("audio_noise_level", audio_noise_level);
++  d.Set("webrtc_leak_shield_enabled", webrtc_leak_shield_enabled);
++  return d;
++}
++FingerprintConfig FingerprintConfig::FromDict(const base::Value::Dict& d) {
++  FingerprintConfig c;
++  if (auto* v = d.FindString("platform")) c.platform = *v;
++  if (auto* v = d.FindString("user_agent")) c.user_agent = *v;
++  if (auto* v = d.FindString("locale")) c.locale = *v;
++  if (auto* v = d.FindString("timezone")) c.timezone = *v;
++  c.screen_width = d.FindInt("screen_width").value_or(0);
++  c.screen_height = d.FindInt("screen_height").value_or(0);
++  c.color_depth = d.FindInt("color_depth").value_or(0);
++  c.device_pixel_ratio = d.FindDouble("device_pixel_ratio").value_or(0.0);
++  c.device_memory = d.FindDouble("device_memory").value_or(0.0);
++  c.hardware_concurrency = d.FindInt("hardware_concurrency").value_or(0);
++  if (auto* v = d.FindString("webgl_vendor")) c.webgl_vendor = *v;
++  if (auto* v = d.FindString("webgl_renderer")) c.webgl_renderer = *v;
++  c.canvas_noise_enabled = d.FindBool("canvas_noise_enabled").value_or(true);
++  c.canvas_noise_level = d.FindDouble("canvas_noise_level").value_or(0.5);
++  c.audio_noise_enabled = d.FindBool("audio_noise_enabled").value_or(true);
++  c.audio_noise_level = d.FindDouble("audio_noise_level").value_or(0.3);
++  c.webrtc_leak_shield_enabled = d.FindBool("webrtc_leak_shield_enabled").value_or(true);
++  return c;
++}
++// --- ProxyConfig ---
++base::Value::Dict ProxyConfig::ToDict() const {
++  base::Value::Dict d;
++  if (!mode.empty()) d.Set("mode", mode);
++  if (!host.empty()) d.Set("host", host);
++  if (port > 0) d.Set("port", port);
++  if (!username.empty()) d.Set("username", username);
++  if (!password.empty()) d.Set("password", password);
++  return d;
++}
++ProxyConfig ProxyConfig::FromDict(const base::Value::Dict& d) {
++  ProxyConfig c;
++  if (auto* v = d.FindString("mode")) c.mode = *v;
++  if (auto* v = d.FindString("host")) c.host = *v;
++  c.port = d.FindInt("port").value_or(0);
++  if (auto* v = d.FindString("username")) c.username = *v;
++  if (auto* v = d.FindString("password")) c.password = *v;
++  return c;
++}
++// --- Account ---
++base::Value::Dict Account::ToDict() const {
++  base::Value::Dict d;
++  d.Set("id", id); d.Set("type", type); d.Set("name", name);
++  if (!notes.empty()) d.Set("notes", notes);
++  d.Set("created_at", static_cast<double>(created_at));
++  d.Set("updated_at", static_cast<double>(updated_at));
++  d.Set("schema_version", schema_version);
++  d.Set("user_data_dir", user_data_dir);
++  d.Set("persona_seed", static_cast<double>(persona_seed));
++  d.Set("fingerprint", fingerprint.ToDict());
++  d.Set("proxy", proxy.ToDict());
++  return d;
++}
++Account Account::FromDict(const base::Value::Dict& d) {
++  Account a;
++  if (auto* v = d.FindString("id")) a.id = *v;
++  if (auto* v = d.FindString("type")) a.type = *v;
++  if (auto* v = d.FindString("name")) a.name = *v;
++  if (auto* v = d.FindString("notes")) a.notes = *v;
++  a.created_at = static_cast<int64_t>(d.FindDouble("created_at").value_or(0));
++  a.updated_at = static_cast<int64_t>(d.FindDouble("updated_at").value_or(0));
++  a.schema_version = d.FindInt("schema_version").value_or(1);
++  if (auto* v = d.FindString("user_data_dir")) a.user_data_dir = *v;
++  a.persona_seed = static_cast<uint64_t>(d.FindDouble("persona_seed").value_or(0));
++  if (auto* v = d.FindDict("fingerprint")) a.fingerprint = FingerprintConfig::FromDict(*v);
++  if (auto* v = d.FindDict("proxy")) a.proxy = ProxyConfig::FromDict(*v);
++  return a;
++}
++// --- RuntimeState ---
++base::Value::Dict RuntimeState::ToDict() const {
++  base::Value::Dict d;
++  d.Set("account_id", account_id); d.Set("status", status);
++  if (!error_message.empty()) d.Set("error_message", error_message);
++  d.Set("unread_count", unread_count);
++  d.Set("last_seen", static_cast<double>(last_seen));
++  if (!status_text.empty()) d.Set("status_text", status_text);
++  if (!current_url.empty()) d.Set("current_url", current_url);
++  if (!current_title.empty()) d.Set("current_title", current_title);
++  d.Set("cdp_port", cdp_port); d.Set("pid", pid);
++  return d;
++}
++RuntimeState RuntimeState::FromDict(const base::Value::Dict& d) {
++  RuntimeState s;
++  if (auto* v = d.FindString("account_id")) s.account_id = *v;
++  if (auto* v = d.FindString("status")) s.status = *v;
++  if (auto* v = d.FindString("error_message")) s.error_message = *v;
++  s.unread_count = d.FindInt("unread_count").value_or(0);
++  s.last_seen = static_cast<int64_t>(d.FindDouble("last_seen").value_or(0));
++  if (auto* v = d.FindString("status_text")) s.status_text = *v;
++  if (auto* v = d.FindString("current_url")) s.current_url = *v;
++  if (auto* v = d.FindString("current_title")) s.current_title = *v;
++  s.cdp_port = d.FindInt("cdp_port").value_or(0);
++  s.pid = d.FindInt("pid").value_or(0);
++  return s;
++}
++// --- EventLog ---
++base::Value::Dict EventLog::ToDict() const {
++  base::Value::Dict d;
++  d.Set("id", id); d.Set("timestamp", static_cast<double>(timestamp));
++  d.Set("account_id", account_id); d.Set("category", category);
++  d.Set("event", event); d.Set("level", level);
++  d.Set("details", details);
++  if (!trace_id.empty()) d.Set("trace_id", trace_id);
++  return d;
++}
++EventLog EventLog::FromDict(const base::Value::Dict& d) {
++  EventLog e;
++  if (auto* v = d.FindString("id")) e.id = *v;
++  e.timestamp = static_cast<int64_t>(d.FindDouble("timestamp").value_or(0));
++  if (auto* v = d.FindString("account_id")) e.account_id = *v;
++  if (auto* v = d.FindString("category")) e.category = *v;
++  if (auto* v = d.FindString("event")) e.event = *v;
++  if (auto* v = d.FindString("level")) e.level = *v;
++  if (auto* v = d.FindString("details")) e.details = *v;
++  if (auto* v = d.FindString("trace_id")) e.trace_id = *v;
++  return e;
++}
++// --- Helpers ---
++base::Value::List AccountListToValue(const std::vector<Account>& accounts) {
++  base::Value::List list;
++  for (const auto& a : accounts) list.Append(a.ToDict());
++  return list;
++}
++std::vector<Account> AccountListFromValue(const base::Value::List& list) {
++  std::vector<Account> accounts;
++  accounts.reserve(list.size());
++  for (const auto& val : list) {
++    if (val.is_dict()) accounts.push_back(Account::FromDict(val.GetDict()));
++  }
++  return accounts;
++}
++std::string GenerateId() { return base::GenerateGUID(); }
++uint64_t GenerateSeed() { return base::RandUint64(); }
++}  // namespace metachat
+\ No newline at end of file
+diff --git a/chrome/browser/ui/webui/metachat/data_model.h b/chrome/browser/ui/webui/metachat/data_model.h
+new file mode 100644
+index 0000000000000..54409cc234127
+--- /dev/null
++++ b/chrome/browser/ui/webui/metachat/data_model.h
+@@ -0,0 +1,126 @@
 +// Copyright 2025 The MetaChat Authors. All rights reserved.
 +
++#ifndef CHROME_BROWSER_UI_WEBUI_METACHAT_DATA_MODEL_H_
++#define CHROME_BROWSER_UI_WEBUI_METACHAT_DATA_MODEL_H_
++
++#include <stdint.h>
++
++#include <string>
++#include <vector>
++
++#include "base/values.h"
++#include "base/version.h"
++
++namespace metachat {
++
++// --- FingerprintConfig -------------------------------------------------
++struct FingerprintConfig {
++  std::string platform;
++  std::string user_agent;
++  std::string locale;
++  std::string timezone;
++
++  int screen_width = 0;
++  int screen_height = 0;
++  int color_depth = 0;
++  double device_pixel_ratio = 0.0;
++
++  double device_memory = 0.0;
++  int hardware_concurrency = 0;
++
++  std::string webgl_vendor;
++  std::string webgl_renderer;
++
++  bool canvas_noise_enabled = true;
++  double canvas_noise_level = 0.5;
++  bool audio_noise_enabled = true;
++  double audio_noise_level = 0.3;
++  bool webrtc_leak_shield_enabled = true;
++
++  base::Value::Dict ToDict() const;
++  static FingerprintConfig FromDict(const base::Value::Dict& dict);
++};
++
++// --- ProxyConfig -------------------------------------------------------
++struct ProxyConfig {
++  std::string mode;
++  std::string host;
++  int port = 0;
++  std::string username;
++  std::string password;
++
++  base::Value::Dict ToDict() const;
++  static ProxyConfig FromDict(const base::Value::Dict& dict);
++};
++
++// --- Account -----------------------------------------------------------
++// One login session = one user-data-dir.
++struct Account {
++  std::string id;
++  std::string type;
++  std::string name;
++  std::string notes;
++
++  int64_t created_at = 0;
++  int64_t updated_at = 0;
++  int schema_version = 1;
++
++  std::string user_data_dir;
++  uint64_t persona_seed = 0;
++
++  FingerprintConfig fingerprint;
++  ProxyConfig proxy;
++
++  // Runtime (not persisted in accounts.json)
++  std::string status;
++  int cdp_port = 0;
++  int unread_count = 0;
++  int64_t last_active = 0;
++  std::string status_text;
++
++  base::Value::Dict ToDict() const;
++  static Account FromDict(const base::Value::Dict& dict);
++};
++
++// --- RuntimeState ------------------------------------------------------
++struct RuntimeState {
++  std::string account_id;
++  std::string status;
++  std::string error_message;
++  int unread_count = 0;
++  int64_t last_seen = 0;
++  std::string status_text;
++  std::string current_url;
++  std::string current_title;
++  int cdp_port = 0;
++  int pid = 0;
++
++  base::Value::Dict ToDict() const;
++  static RuntimeState FromDict(const base::Value::Dict& dict);
++};
++
++// --- EventLog ----------------------------------------------------------
++struct EventLog {
++  std::string id;
++  int64_t timestamp = 0;
++  std::string account_id;
++  std::string category;
++  std::string event;
++  std::string level;
++  std::string details;
++  std::string trace_id;
++
++  base::Value::Dict ToDict() const;
++  static EventLog FromDict(const base::Value::Dict& dict);
++};
++
++// --- Helpers -----------------------------------------------------------
++base::Value::List AccountListToValue(const std::vector<Account>& accounts);
++std::vector<Account> AccountListFromValue(const base::Value::List& list);
++
++std::string GenerateId();
++uint64_t GenerateSeed();
++
++}  // namespace metachat
++
++#endif  // CHROME_BROWSER_UI_WEBUI_METACHAT_DATA_MODEL_H_
+diff --git a/chrome/browser/ui/webui/metachat/event_log.cc b/chrome/browser/ui/webui/metachat/event_log.cc
+new file mode 100644
+index 0000000000000..08cfcc4015447
+--- /dev/null
++++ b/chrome/browser/ui/webui/metachat/event_log.cc
+@@ -0,0 +1,51 @@
++// Copyright 2025 The MetaChat Authors.
++#include "chrome/browser/ui/webui/metachat/event_log.h"
++#include "base/files/file_util.h"
++#include "base/json/json_reader.h"
++#include "base/json/json_writer.h"
 +#include "base/logging.h"
++#include "base/time/time.h"
++namespace metachat {
++EventLogger::EventLogger(const base::FilePath& log_dir) : log_dir_(log_dir) {
++  base::CreateDirectory(log_dir_);
++}
++void EventLogger::Log(const EventLog& entry) {
++  base::FilePath path = GetLogPathForDate(entry.timestamp);
++  std::vector<EventLog> events;
++  if (base::PathExists(path)) {
++    events = Query(0, 0);
++  }
++  events.push_back(entry);
++  base::Value::List list;
++  for (const auto& e : events) list.Append(e.ToDict());
++  std::string json;
++  base::JSONWriter::WriteWithOptions(list, base::JSONWriter::OPTIONS_PRETTY_PRINT, &json);
++  if (!base::WriteFile(path, json)) {
++    LOG(WARNING) << "EventLogger: failed to write " << path;
++  }
++}
++std::vector<EventLog> EventLogger::Query(int64_t since, size_t limit) {
++  base::FilePath path = GetLogPathForDate(base::Time::Now().InMillisecondsSinceUnixEpoch());
++  if (!base::PathExists(path)) return {};
++  std::string json;
++  if (!base::ReadFileToString(path, &json)) return {};
++  auto parsed = base::JSONReader::Read(json);
++  if (!parsed || !parsed->is_list()) return {};
++  std::vector<EventLog> result;
++  for (const auto& val : parsed->GetList()) {
++    if (!val.is_dict()) continue;
++    EventLog e = EventLog::FromDict(val.GetDict());
++    if (since == 0 || e.timestamp >= since) result.push_back(e);
++  }
++  if (limit > 0 && result.size() > limit) result.resize(limit);
++  return result;
++}
++base::FilePath EventLogger::GetLogPathForDate(int64_t timestamp) const {
++  base::Time time = base::Time::FromMillisecondsSinceUnixEpoch(timestamp);
++  base::Time::Exploded exploded;
++  time.UTCExplode(&exploded);
++  std::string filename = base::StringPrintf("%04d-%02d-%02d.json",
++      exploded.year, exploded.month, exploded.day_of_month);
++  return log_dir_.AppendASCII(filename);
++}
++}  // namespace metachat
+\ No newline at end of file
+diff --git a/chrome/browser/ui/webui/metachat/event_log.h b/chrome/browser/ui/webui/metachat/event_log.h
+new file mode 100644
+index 0000000000000..8c151b095d81f
+--- /dev/null
++++ b/chrome/browser/ui/webui/metachat/event_log.h
+@@ -0,0 +1,19 @@
++// Copyright 2025 The MetaChat Authors.
++#ifndef CHROME_BROWSER_UI_WEBUI_METACHAT_EVENT_LOG_H_
++#define CHROME_BROWSER_UI_WEBUI_METACHAT_EVENT_LOG_H_
++#include <string>
++#include <vector>
++#include "base/files/file_path.h"
++#include "chrome/browser/ui/webui/metachat/data_model.h"
++namespace metachat {
++class EventLogger {
++ public:
++  explicit EventLogger(const base::FilePath& log_dir);
++  void Log(const EventLog& entry);
++  std::vector<EventLog> Query(int64_t since, size_t limit);
++ private:
++  base::FilePath GetLogPathForDate(int64_t timestamp) const;
++  base::FilePath log_dir_;
++};
++}  // namespace metachat
++#endif
+\ No newline at end of file
+diff --git a/chrome/browser/ui/webui/metachat/message_bus.cc b/chrome/browser/ui/webui/metachat/message_bus.cc
+new file mode 100644
+index 0000000000000..5429b0264df5f
+--- /dev/null
++++ b/chrome/browser/ui/webui/metachat/message_bus.cc
+@@ -0,0 +1,400 @@
++// MetaChat: Message bus - WebUI <-> C++ bidirectional communication
++// Copyright 2025 The MetaChat Authors. All rights reserved.
++
 +#include "chrome/browser/ui/webui/metachat/message_bus.h"
 +
 +#include <utility>
@@ -2612,6 +3932,11 @@ index 0000000000000..fd31993cce742
 +#include "base/time/time.h"
 +#include "base/trace_event/trace_event.h"
 +#include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/ui/webui/metachat/account_store.h"
++#include "chrome/browser/ui/webui/metachat/cdp_bridge.h"
++#include "chrome/browser/ui/webui/metachat/data_model.h"
++#include "chrome/browser/ui/webui/metachat/event_log.h"
++#include "chrome/browser/ui/webui/metachat/window_manager.h"
 +#include "content/public/browser/web_ui.h"
 +
 +namespace {
@@ -2660,6 +3985,13 @@ index 0000000000000..fd31993cce742
 +
 +void MetaChatMessageBus::RegisterMessages() {
 +  profile_ = Profile::FromWebUI(web_ui());
++  account_store_ = std::make_unique<metachat::AccountStore>(profile_);
++  window_manager_ = std::make_unique<metachat::WindowManager>(profile_);
++  base::FilePath log_dir = profile_->GetPath()
++      .Append(FILE_PATH_LITERAL("metachat"))
++      .Append(FILE_PATH_LITERAL("events"));
++  event_logger_ = std::make_unique<metachat::EventLogger>(log_dir);
++
 +  web_ui()->RegisterMessageCallback(
 +      "metachat.dispatch",
 +      base::BindRepeating(&MetaChatMessageBus::HandleDispatch,
@@ -2678,13 +4010,26 @@ index 0000000000000..fd31993cce742
 +  const std::string* request_id = args[3].GetIfString();
 +  const base::Value::Dict* meta = nullptr;
 +  if (args.size() >= 5) meta = args[4].GetIfDict();
++
 +  if (!channel || !action || !request_id) {
 +    LOG(WARNING) << "MetaChatMessageBus: invalid dispatch args";
 +    return;
 +  }
++
 +  DVLOG(1) << "MetaChat: " << *channel << "." << *action
 +           << " req=" << *request_id;
 +  LogMetaIfPresent(meta, *channel, *action, *request_id);
++
++  // Log event for debugging
++  metachat::EventLog log_entry;
++  log_entry.timestamp = base::Time::Now().InMillisecondsSinceUnixEpoch();
++  log_entry.account_id = *channel;
++  log_entry.category = "dispatch";
++  log_entry.event = *channel + "." + *action;
++  log_entry.level = "info";
++  log_entry.trace_id = meta ? meta->FindString("traceId").value_or("") : "";
++  event_logger_->Log(log_entry);
++
 +  if (*channel == "accounts")
 +    HandleAccounts(*action, payload, *request_id);
 +  else if (*channel == "webs")
@@ -2695,6 +4040,8 @@ index 0000000000000..fd31993cce742
 +    HandleConfig(*action, payload, *request_id);
 +  else if (*channel == "notification")
 +    HandleNotification(*action, payload, *request_id);
++  else if (*channel == "events")
++    HandleEvents(*action, payload, *request_id);
 +  else
 +    SendResponse(*channel, *action,
 +                 MakeError("unknown_channel", "Unknown: " + *channel),
@@ -2732,90 +4079,294 @@ index 0000000000000..fd31993cce742
 +  return err;
 +}
 +
++// ─── Accounts ──────────────────────────────────────────────────────
++
 +void MetaChatMessageBus::HandleAccounts(
 +    const std::string& action, const base::Value::Dict* payload,
 +    const std::string& request_id) {
 +  if (action == "list") {
++    auto accounts = account_store_->LoadAll();
 +    base::Value::Dict result;
-+    result.Set("accounts", base::Value::List());
++    result.Set("accounts", metachat::AccountListToValue(accounts));
 +    SendResponse("accounts", action, std::move(result), request_id);
++  } else if (action == "create") {
++    if (!payload) {
++      SendResponse("accounts", action, MakeError("invalid_payload", ""), request_id);
++      return;
++    }
++    metachat::Account a = metachat::Account::FromDict(*payload);
++    if (a.id.empty()) a.id = metachat::GenerateId();
++    a.created_at = base::Time::Now().InMillisecondsSinceUnixEpoch();
++    a.updated_at = a.created_at;
++    auto accounts = account_store_->LoadAll();
++    // Check duplicate id
++    for (const auto& existing : accounts) {
++      if (existing.id == a.id) {
++        SendResponse("accounts", action,
++                     MakeError("duplicate_id", "Account ID already exists"),
++                     request_id);
++        return;
++      }
++    }
++    accounts.push_back(a);
++    account_store_->SaveAll(accounts);
++    base::Value::Dict result;
++    result.Set("account", a.ToDict());
++    SendResponse("accounts", action, std::move(result), request_id);
++  } else if (action == "update") {
++    if (!payload) {
++      SendResponse("accounts", action, MakeError("invalid_payload", ""), request_id);
++      return;
++    }
++    metachat::Account a = metachat::Account::FromDict(*payload);
++    auto accounts = account_store_->LoadAll();
++    bool found = false;
++    for (auto& existing : accounts) {
++      if (existing.id == a.id) {
++        existing = a;
++        existing.updated_at = base::Time::Now().InMillisecondsSinceUnixEpoch();
++        found = true;
++        break;
++      }
++    }
++    if (!found) {
++      SendResponse("accounts", action,
++                   MakeError("not_found", "Account not found: " + a.id),
++                   request_id);
++      return;
++    }
++    account_store_->SaveAll(accounts);
++    base::Value::Dict result;
++    result.Set("account", a.ToDict());
++    SendResponse("accounts", action, std::move(result), request_id);
++  } else if (action == "delete") {
++    if (!payload) {
++      SendResponse("accounts", action, MakeError("invalid_payload", ""), request_id);
++      return;
++    }
++    const std::string* id = payload->FindString("id");
++    if (!id) {
++      SendResponse("accounts", action, MakeError("missing_id", ""), request_id);
++      return;
++    }
++    auto accounts = account_store_->LoadAll();
++    std::erase_if(accounts, [&](const metachat::Account& a) { return a.id == *id; });
++    account_store_->SaveAll(accounts);
++    SendResponse("accounts", action, base::Value::Dict(), request_id);
 +  } else {
 +    SendResponse("accounts", action,
-+        MakeError("not_implemented",
-+            "accounts: " + action + " not implemented"), request_id);
++        MakeError("unknown_action", "accounts: " + action + " unknown"),
++        request_id);
 +  }
 +}
++
++// ─── Webs ─────────────────────────────────────────────────────────
 +
 +void MetaChatMessageBus::HandleWebs(
 +    const std::string& action, const base::Value::Dict* payload,
 +    const std::string& request_id) {
-+  SendResponse("webs", action,
-+      MakeError("not_implemented", "webs: " + action + " not implemented"),
-+      request_id);
++  if (action == "open" && payload) {
++    const std::string* account_id = payload->FindString("account_id");
++    const std::string* url_str = payload->FindString("url");
++    if (!account_id || !url_str) {
++      SendResponse("webs", action, MakeError("missing_fields", ""), request_id);
++      return;
++    }
++    window_manager_->OpenOrFocus(*account_id, GURL(*url_str));
++    base::Value::Dict result;
++    result.Set("status", "opened");
++    result.Set("account_id", *account_id);
++    SendResponse("webs", action, std::move(result), request_id);
++  } else if (action == "close" && payload) {
++    const std::string* account_id = payload->FindString("account_id");
++    if (!account_id) {
++      SendResponse("webs", action, MakeError("missing_id", ""), request_id);
++      return;
++    }
++    window_manager_->Close(*account_id);
++    base::Value::Dict result;
++    result.Set("status", "closed");
++    SendResponse("webs", action, std::move(result), request_id);
++  } else if (action == "hide" && payload) {
++    const std::string* account_id = payload->FindString("account_id");
++    if (!account_id) {
++      SendResponse("webs", action, MakeError("missing_id", ""), request_id);
++      return;
++    }
++    window_manager_->Hide(*account_id);
++    base::Value::Dict result;
++    result.Set("status", "hidden");
++    SendResponse("webs", action, std::move(result), request_id);
++  } else if (action == "focus" && payload) {
++    const std::string* account_id = payload->FindString("account_id");
++    if (!account_id) {
++      SendResponse("webs", action, MakeError("missing_id", ""), request_id);
++      return;
++    }
++    window_manager_->Focus(*account_id);
++    base::Value::Dict result;
++    result.Set("status", "focused");
++    SendResponse("webs", action, std::move(result), request_id);
++  } else {
++    SendResponse("webs", action,
++        MakeError("unknown_action", "webs: " + action + " unknown"),
++        request_id);
++  }
 +}
++
++// ─── CDP ──────────────────────────────────────────────────────────
 +
 +void MetaChatMessageBus::HandleCdp(
 +    const std::string& action, const base::Value::Dict* payload,
 +    const std::string& request_id) {
-+  SendResponse("cdp", action,
-+      MakeError("not_implemented", "cdp: " + action + " not implemented"),
-+      request_id);
++  if (action == "send" && payload) {
++    const std::string* account_id = payload->FindString("account_id");
++    const std::string* method = payload->FindString("method");
++    const base::Value::Dict* params = payload->FindDict("params");
++    if (!account_id || !method) {
++      SendResponse("cdp", action, MakeError("missing_fields", ""), request_id);
++      return;
++    }
++    content::WebContents* wc = window_manager_->GetWebContents(*account_id);
++    if (!wc) {
++      SendResponse("cdp", action, MakeError("no_window", ""), request_id);
++      return;
++    }
++    metachat::CdpBridge bridge;
++    bridge.Attach(wc);
++    base::Value::Dict result = bridge.SendCommand(
++        *method, params ? params->Clone() : base::Value::Dict());
++    SendResponse("cdp", action, std::move(result), request_id);
++  } else {
++    SendResponse("cdp", action,
++        MakeError("unknown_action", "cdp: " + action + " unknown"),
++        request_id);
++  }
 +}
++
++// ─── Config ───────────────────────────────────────────────────────
 +
 +void MetaChatMessageBus::HandleConfig(
 +    const std::string& action, const base::Value::Dict* payload,
 +    const std::string& request_id) {
-+  SendResponse("config", action,
-+      MakeError("not_implemented", "config: " + action + " not implemented"),
-+      request_id);
++  base::FilePath config_path = profile_->GetPath()
++      .Append(FILE_PATH_LITERAL("metachat"))
++      .Append(FILE_PATH_LITERAL("config.json"));
++
++  if (action == "get") {
++    std::string json;
++    base::Value::Dict config;
++    if (base::ReadFileToString(config_path, &json)) {
++      auto parsed = base::JSONReader::Read(json);
++      if (parsed && parsed->is_dict()) {
++        config = std::move(parsed->GetDict());
++      }
++    }
++    base::Value::Dict result;
++    result.Set("config", std::move(config));
++    SendResponse("config", action, std::move(result), request_id);
++  } else if (action == "set" && payload) {
++    const base::Value::Dict* config_dict = payload->FindDict("config");
++    if (!config_dict) {
++      SendResponse("config", action, MakeError("missing_config", ""), request_id);
++      return;
++    }
++    base::CreateDirectory(config_path.DirName());
++    std::string json;
++    base::JSONWriter::WriteWithOptions(
++        *config_dict, base::JSONWriter::OPTIONS_PRETTY_PRINT, &json);
++    base::WriteFile(config_path, json);
++    SendResponse("config", action, base::Value::Dict(), request_id);
++  } else {
++    SendResponse("config", action,
++        MakeError("unknown_action", "config: " + action + " unknown"),
++        request_id);
++  }
 +}
++
++// ─── Notification ─────────────────────────────────────────────────
 +
 +void MetaChatMessageBus::HandleNotification(
 +    const std::string& action, const base::Value::Dict* payload,
 +    const std::string& request_id) {
-+  SendResponse("notification", action,
-+      MakeError("not_implemented",
-+          "notification: " + action + " not implemented"), request_id);
++  // Notifications are push (server -> client) via SendEvent.
++  // For MVP, just acknowledge.
++  base::Value::Dict result;
++  result.Set("status", "ok");
++  result.Set("note", "notification pushes configured server-side");
++  SendResponse("notification", action, std::move(result), request_id);
++}
++
++// ─── Events ───────────────────────────────────────────────────────
++
++void MetaChatMessageBus::HandleEvents(
++    const std::string& action, const base::Value::Dict* payload,
++    const std::string& request_id) {
++  if (action == "query") {
++    int64_t since = static_cast<int64_t>(
++        payload ? payload->FindDouble("since").value_or(0) : 0);
++    size_t limit = static_cast<size_t>(
++        payload ? payload->FindInt("limit").value_or(0) : 0);
++    auto entries = event_logger_->Query(since, limit);
++    base::Value::List list;
++    for (const auto& e : entries) list.Append(e.ToDict());
++    base::Value::Dict result;
++    result.Set("events", std::move(list));
++    SendResponse("events", action, std::move(result), request_id);
++  } else {
++    SendResponse("events", action,
++        MakeError("unknown_action", "events: " + action + " unknown"),
++        request_id);
++  }
++}
 diff --git a/chrome/browser/ui/webui/metachat/message_bus.h b/chrome/browser/ui/webui/metachat/message_bus.h
 new file mode 100644
-index 0000000000000..27ab142b45fc0
+index 0000000000000..5da8193e5114f
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/message_bus.h
-@@ -0,0 +1,53 @@
+@@ -0,0 +1,69 @@
 +// Copyright 2025 The MetaChat Authors. All rights reserved.
 +
 +#ifndef CHROME_BROWSER_UI_WEBUI_METACHAT_MESSAGE_BUS_H_
 +#define CHROME_BROWSER_UI_WEBUI_METACHAT_MESSAGE_BUS_H_
 +
++#include <memory>
 +#include <string>
 +
-+#include "base/memory/raw_ptr.h"
 +#include "base/values.h"
 +#include "content/public/browser/web_ui_message_handler.h"
 +
 +class Profile;
 +
-+// MetaChat Message Bus - centralized JS <-> C++ communication.
-+// Protocol: chrome.send("metachat.dispatch", [channel, action, payload, requestId, meta])
-+// Channels: accounts | webs | cdp | config | notification
-+// Meta: {timestamp, traceId, source} for debugging
++namespace metachat {
++class AccountStore;
++class WindowManager;
++class EventLogger;
++}  // namespace metachat
++
 +class MetaChatMessageBus : public content::WebUIMessageHandler {
 + public:
 +  MetaChatMessageBus();
 +  ~MetaChatMessageBus() override;
 +  void RegisterMessages() override;
++
 +  void SendEvent(const std::string& channel,
 +                 const std::string& event_name,
 +                 base::Value::Dict payload);
 +
 + private:
++  // Dispatch entry point
 +  void HandleDispatch(const base::Value::List& args);
 +  void SendResponse(const std::string& channel,
 +                    const std::string& action,
 +                    base::Value::Dict payload,
 +                    const std::string& request_id);
++
++  // Error helper
 +  base::Value::Dict MakeError(const std::string& code,
 +                              const std::string& message);
++
++  // Channel handlers
 +  void HandleAccounts(const std::string& action,
 +                      const base::Value::Dict* payload,
 +                      const std::string& request_id);
@@ -2831,7 +4382,15 @@ index 0000000000000..27ab142b45fc0
 +  void HandleNotification(const std::string& action,
 +                          const base::Value::Dict* payload,
 +                          const std::string& request_id);
-+  raw_ptr<Profile> profile_ = nullptr;
++  void HandleEvents(const std::string& action,
++                    const base::Value::Dict* payload,
++                    const std::string& request_id);
++
++  // Modules
++  std::unique_ptr<metachat::AccountStore> account_store_;
++  std::unique_ptr<metachat::WindowManager> window_manager_;
++  std::unique_ptr<metachat::EventLogger> event_logger_;
++  Profile* profile_ = nullptr;
 +};
 +
 +#endif  // CHROME_BROWSER_UI_WEBUI_METACHAT_MESSAGE_BUS_H_
@@ -2907,6 +4466,152 @@ index 0000000000000..a1c9e20808726
 +};
 +
 +#endif  // CHROME_BROWSER_UI_WEBUI_METACHAT_METACHAT_UI_H_
+diff --git a/chrome/browser/ui/webui/metachat/window_manager.cc b/chrome/browser/ui/webui/metachat/window_manager.cc
+new file mode 100644
+index 0000000000000..7f965c99e73ec
+--- /dev/null
++++ b/chrome/browser/ui/webui/metachat/window_manager.cc
+@@ -0,0 +1,66 @@
++// Copyright 2025 The MetaChat Authors.
++#include "chrome/browser/ui/webui/metachat/window_manager.h"
++#include "base/logging.h"
++#include "chrome/browser/ui/browser.h"
++#include "chrome/browser/ui/browser_commands.h"
++#include "chrome/browser/ui/browser_navigator.h"
++#include "chrome/browser/ui/browser_navigator_params.h"
++#include "chrome/browser/ui/browser_window.h"
++#include "content/public/browser/web_contents.h"
++namespace metachat {
++WindowManager::WindowManager(Profile* host_profile) : host_profile_(host_profile) {}
++WindowManager::~WindowManager() {
++  for (auto& [id, entry] : windows_) {
++    if (entry.browser && entry.browser->window()) {
++      entry.browser->window()->Close();
++    }
++  }
++}
++Browser* WindowManager::OpenOrFocus(const std::string& account_id, const GURL& url) {
++  auto it = windows_.find(account_id);
++  if (it != windows_.end() && it->second.browser) {
++    DVLOG(1) << "WM: focus " << account_id;
++    it->second.browser->window()->Show();
++    return it->second.browser;
++  }
++  DVLOG(1) << "WM: create " << account_id;
++  Browser::CreateParams params(Browser::TYPE_NORMAL, host_profile_, false);
++  params.initial_bounds = gfx::Rect(100, 100, 1280, 800);
++  Browser* browser = Browser::Create(params);
++  NavigateParams nav_params(browser, url, ui::PAGE_TRANSITION_TYPED);
++  nav_params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
++  Navigate(&nav_params);
++  windows_[account_id] = {browser, nav_params.navigated_or_inserted_contents.get()};
++  browser->window()->Show();
++  return browser;
++}
++void WindowManager::Hide(const std::string& account_id) {
++  auto it = windows_.find(account_id);
++  if (it != windows_.end() && it->second.browser && it->second.browser->window()) {
++    DVLOG(1) << "WM: hide " << account_id;
++    it->second.browser->window()->Hide();
++  }
++}
++void WindowManager::Close(const std::string& account_id) {
++  auto it = windows_.find(account_id);
++  if (it != windows_.end() && it->second.browser) {
++    DVLOG(1) << "WM: close " << account_id;
++    chrome::CloseWindow(it->second.browser);
++    windows_.erase(it);
++  }
++}
++Browser* WindowManager::GetBrowser(const std::string& account_id) const {
++  auto it = windows_.find(account_id);
++  return it != windows_.end() ? it->second.browser : nullptr;
++}
++content::WebContents* WindowManager::GetWebContents(const std::string& account_id) const {
++  auto it = windows_.find(account_id);
++  return it != windows_.end() ? it->second.web_contents : nullptr;
++}
++void WindowManager::Focus(const std::string& account_id) {
++  auto it = windows_.find(account_id);
++  if (it != windows_.end() && it->second.browser && it->second.browser->window()) {
++    it->second.browser->window()->Show();
++  }
++}
++}  // namespace metachat
+\ No newline at end of file
+diff --git a/chrome/browser/ui/webui/metachat/window_manager.h b/chrome/browser/ui/webui/metachat/window_manager.h
+new file mode 100644
+index 0000000000000..e40d78700377e
+--- /dev/null
++++ b/chrome/browser/ui/webui/metachat/window_manager.h
+@@ -0,0 +1,31 @@
++// Copyright 2025 The MetaChat Authors.
++#ifndef CHROME_BROWSER_UI_WEBUI_METACHAT_WINDOW_MANAGER_H_
++#define CHROME_BROWSER_UI_WEBUI_METACHAT_WINDOW_MANAGER_H_
++#include <string>
++#include <unordered_map>
++#include "base/memory/raw_ptr.h"
++class Browser;
++class Profile;
++class GURL;
++namespace content { class WebContents; }
++namespace metachat {
++class WindowManager {
++ public:
++  explicit WindowManager(Profile* host_profile);
++  ~WindowManager();
++  Browser* OpenOrFocus(const std::string& account_id, const GURL& url);
++  void Hide(const std::string& account_id);
++  void Close(const std::string& account_id);
++  Browser* GetBrowser(const std::string& account_id) const;
++  content::WebContents* GetWebContents(const std::string& account_id) const;
++  void Focus(const std::string& account_id);
++ private:
++  struct WindowEntry {
++    Browser* browser = nullptr;
++    content::WebContents* web_contents = nullptr;
++  };
++  std::unordered_map<std::string, WindowEntry> windows_;
++  Profile* host_profile_ = nullptr;
++};
++}  // namespace metachat
++#endif
+\ No newline at end of file
+diff --git a/chrome/common/webui_url_constants.cc b/chrome/common/webui_url_constants.cc
+index dd37ab85cec11..666742b835ccb 100644
+--- a/chrome/common/webui_url_constants.cc
++++ b/chrome/common/webui_url_constants.cc
+@@ -119,6 +119,8 @@ bool IsSystemWebUIHost(std::string_view host) {
+ 
+ // Add hosts here to be included in chrome://chrome-urls (about:about).
+ // These hosts will also be suggested by BuiltinProvider.
++// MetaChat Browser
++inline constexpr char kChromeUIMetaChatURL[] = "chrome://metachat/";
+ base::span<const base::cstring_view> ChromeURLHosts() {
+   static constexpr auto kChromeURLHosts = std::to_array<base::cstring_view>({
+       kChromeUIAboutHost,
+@@ -336,7 +338,8 @@ const GURL& ChromeUINewTabPageURLAsGURL() {
+ }
+ 
+ const GURL& ChromeUINewTabURLAsGURL() {
+-  static base::NoDestructor<GURL> instance(kChromeUINewTabURL);
++  // Lightweight-fork: blank NTP instead of the Google-branded chrome://newtab.
++  static base::NoDestructor<GURL> instance("about:blank");
+   return *instance;
+ }
+ 
+diff --git a/chrome/common/webui_url_constants.h b/chrome/common/webui_url_constants.h
+index dd6c19a3b2bf0..86db3a2d3ae27 100644
+--- a/chrome/common/webui_url_constants.h
++++ b/chrome/common/webui_url_constants.h
+@@ -217,6 +217,7 @@ inline constexpr char kChromeUIMediaEngagementHost[] = "media-engagement";
+ inline constexpr char kChromeUIMediaRouterInternalsHost[] =
+     "media-router-internals";
+ inline constexpr char kChromeUIMemoryInternalsHost[] = "memory-internals";
++inline constexpr char kChromeUIMetaChatHost[] = "metachat";
+ inline constexpr char kChromeUIMetricsInternalsHost[] = "metrics-internals";
+ inline constexpr char kChromeUINetExportHost[] = "net-export";
+ inline constexpr char kChromeUINetInternalsHost[] = "net-internals";
 diff --git a/chrome/renderer/chrome_content_renderer_client.cc b/chrome/renderer/chrome_content_renderer_client.cc
 index e177eded759db..c215596238900 100644
 --- a/chrome/renderer/chrome_content_renderer_client.cc
@@ -3262,6 +4967,590 @@ index 4ad0bb0eb1c07..fe23ba9e49053 100644
  };
  
  int GetDataVersion() {
+diff --git a/content/browser/BUILD.gn b/content/browser/BUILD.gn
+index 1519637194b4a..d562c9d90a510 100644
+--- a/content/browser/BUILD.gn
++++ b/content/browser/BUILD.gn
+@@ -122,6 +122,7 @@ source_set("browser") {
+     "//components/attribution_reporting:mojom",
+     "//components/back_forward_cache:enum",
+     "//components/browsing_data/core:cookie_or_cache_deletion_choice",
++    "//components/canvas_bridge",
+     "//components/browsing_topics/common",
+     "//components/cbor",
+     "//components/discardable_memory/common",
+@@ -925,6 +926,7 @@ source_set("browser") {
+     "devtools/protocol/background_service_handler.h",
+     "devtools/protocol/browser_handler.cc",
+     "devtools/protocol/browser_handler.h",
++    "devtools/protocol/humanized_cursor_overlay_mac.h",
+     "devtools/protocol/device_access_handler.cc",
+     "devtools/protocol/device_access_handler.h",
+     "devtools/protocol/device_orientation_handler.cc",
+@@ -1196,6 +1198,7 @@ source_set("browser") {
+     "host_zoom_level_context.h",
+     "host_zoom_map_impl.cc",
+     "host_zoom_map_impl.h",
++    "humanized_click.cc",
+     "idle/idle_manager_impl.cc",
+     "idle/idle_manager_impl.h",
+     "image_capture/image_capture_impl.cc",
+@@ -2864,6 +2867,8 @@ source_set("browser") {
+         [ "file_system_access/file_path_watcher/file_path_watcher_stub.cc" ]
+ 
+     sources += [
++      # Lightweight-fork: cursor overlay for humanizedClick visualization.
++      "devtools/protocol/humanized_cursor_overlay_mac.mm",
+       "../app_shim_remote_cocoa/ns_view_bridge_factory_impl.mm",
+       "../app_shim_remote_cocoa/popup_window_mac.h",
+       "../app_shim_remote_cocoa/popup_window_mac.mm",
+diff --git a/content/browser/devtools/protocol/browser_handler.cc b/content/browser/devtools/protocol/browser_handler.cc
+index 4e6024318432d..b1ee252411521 100644
+--- a/content/browser/devtools/protocol/browser_handler.cc
++++ b/content/browser/devtools/protocol/browser_handler.cc
+@@ -32,6 +32,21 @@
+ #include "content/browser/devtools/devtools_agent_host_impl.h"
+ #include "content/browser/devtools/devtools_manager.h"
+ #include "content/browser/devtools/protocol/devtools_download_manager_delegate.h"
++#include "base/rand_util.h"
++#include "base/timer/timer.h"
++#include "components/input/render_widget_host_input_event_router.h"
++#include "content/browser/renderer_host/render_widget_host_impl.h"
++#include "content/browser/renderer_host/render_widget_host_view_base.h"
++#include "content/public/browser/web_contents.h"
++#include "content/public/browser/web_contents_delegate.h"
++#include "third_party/blink/public/common/input/web_mouse_event.h"
++#include "ui/events/base_event_utils.h"
++#include "ui/latency/latency_info.h"
++#include "content/public/browser/render_frame_host.h"
++#include "content/public/common/isolated_world_ids.h"
++#if BUILDFLAG(IS_MAC)
++#include "content/browser/devtools/protocol/humanized_cursor_overlay_mac.h"
++#endif
+ #include "content/browser/gpu/gpu_process_host.h"
+ #include "content/browser/interest_group/interest_group_manager_impl.h"
+ #include "content/browser/permissions/permission_controller_impl.h"
+@@ -704,6 +719,486 @@ Response BrowserHandler::CrashGpuProcess() {
+   return Response::Success();
+ }
+ 
++namespace {
++
++// Cubic bezier at t in [0,1].
++gfx::PointF CubicBezier(gfx::PointF p0,
++                        gfx::PointF p1,
++                        gfx::PointF p2,
++                        gfx::PointF p3,
++                        double t) {
++  const double u = 1.0 - t;
++  return gfx::PointF(
++      u * u * u * p0.x() + 3 * u * u * t * p1.x() + 3 * u * t * t * p2.x() +
++          t * t * t * p3.x(),
++      u * u * u * p0.y() + 3 * u * u * t * p1.y() + 3 * u * t * t * p2.y() +
++          t * t * t * p3.y());
++}
++
++// Smoothstep — slow start, fast middle, slow end.
++double EaseInOut(double t) {
++  return t * t * (3.0 - 2.0 * t);
++}
++
++// Bounded gaussian using Box-Muller, clamped.
++double Gauss(double sigma, double clamp_abs) {
++  if (sigma <= 0) {
++    return 0.0;
++  }
++  const double u1 = std::max(1e-9, base::RandDouble());
++  const double u2 = base::RandDouble();
++  const double z = std::sqrt(-2.0 * std::log(u1)) * std::cos(2.0 * M_PI * u2);
++  return std::clamp(z * sigma, -clamp_abs, clamp_abs);
++}
++
++// Self-owned humanized-click state machine. Lives on the UI thread, drives
++// itself via base::OneShotTimer, and self-destructs when done (success or
++// after firing the CDP callback once).
++class HumanizedClickRunner {
++ public:
++  using CallbackPtr =
++      std::unique_ptr<BrowserHandler::HumanizedClickCallback>;
++
++  static void Start(base::WeakPtr<RenderWidgetHostImpl> rwh,
++                    base::WeakPtr<WebContents> web_contents,
++                    gfx::PointF target,
++                    double duration_seconds,
++                    bool no_click,
++                    bool visualize,
++                    CallbackPtr callback) {
++    new HumanizedClickRunner(std::move(rwh), std::move(web_contents), target,
++                             duration_seconds, no_click, visualize,
++                             std::move(callback));
++  }
++
++ private:
++  HumanizedClickRunner(base::WeakPtr<RenderWidgetHostImpl> rwh,
++                       base::WeakPtr<WebContents> web_contents,
++                       gfx::PointF target,
++                       double duration_seconds,
++                       bool no_click,
++                       bool visualize,
++                       CallbackPtr callback)
++      : rwh_(std::move(rwh)),
++        web_contents_(std::move(web_contents)),
++        target_(target),
++        no_click_(no_click),
++        visualize_(visualize),
++        callback_(std::move(callback)) {
++    // Start from a neutral cursor position. We don't know where the renderer
++    // thinks the cursor currently is, so start somewhere off the path and let
++    // the move sequence walk to target. Use the document origin as the start
++    // (gives a deterministic, non-suspicious entry).
++    const gfx::PointF start(0.f, 0.f);
++    const double dx = target.x() - start.x();
++    const double dy = target.y() - start.y();
++    const double dist = std::hypot(dx, dy);
++
++    const double duration = std::clamp(duration_seconds, 0.05, 10.0);
++    const int steps = std::max(8, static_cast<int>(duration * 120.0));
++    step_dt_ = base::Microseconds(static_cast<int64_t>(duration * 1e6 / steps));
++
++    // Bow the path perpendicular to the straight line by ±15% of distance.
++    const double px = dist > 0 ? -dy / dist : 0.0;
++    const double py = dist > 0 ? dx / dist : 0.0;
++    const double bow1 = (base::RandDouble() * 0.30 - 0.15) * dist;
++    const double bow2 = (base::RandDouble() * 0.30 - 0.15) * dist;
++    const gfx::PointF cp1(start.x() + dx * 0.33 + px * bow1,
++                          start.y() + dy * 0.33 + py * bow1);
++    const gfx::PointF cp2(start.x() + dx * 0.66 + px * bow2,
++                          start.y() + dy * 0.66 + py * bow2);
++
++    path_.reserve(steps + 1);
++    for (int i = 1; i <= steps; ++i) {
++      const double t = EaseInOut(static_cast<double>(i) / steps);
++      gfx::PointF p = CubicBezier(start, cp1, cp2, target, t);
++      p.set_x(static_cast<float>(p.x() + Gauss(0.4, 2.0)));
++      p.set_y(static_cast<float>(p.y() + Gauss(0.4, 2.0)));
++      path_.push_back(p);
++    }
++    // Exact landing (no jitter) so the click lands on target.
++    path_.push_back(target);
++
++    // Kick the first event immediately, then schedule the next.
++    Tick();
++  }
++
++  ~HumanizedClickRunner() = default;
++
++  void UpdateOverlay(gfx::PointF viewport_point) {
++    if (!visualize_) {
++      return;
++    }
++#if BUILDFLAG(IS_MAC)
++    if (!web_contents_) {
++      return;
++    }
++    RenderWidgetHostViewBase* view =
++        rwh_ && rwh_->GetView()
++            ? static_cast<RenderWidgetHostViewBase*>(rwh_->GetView())
++            : nullptr;
++    if (!view) {
++      return;
++    }
++    // The cursor overlay is a child view of the content view, positioned in the
++    // view's own coordinate space (CSS/DIP, top-left) — which is exactly the
++    // viewport point. No screen / primary-display conversion (that was wrong on
++    // secondary or fractionally-scaled displays).
++    const int vx = static_cast<int>(viewport_point.x());
++    const int vy = static_cast<int>(viewport_point.y());
++    if (!overlay_visible_) {
++      devtools::ShowCursorOverlay(view->GetNativeView(), vx, vy);
++      overlay_visible_ = true;
++    } else {
++      devtools::UpdateCursorOverlay(vx, vy);
++    }
++#endif
++  }
++
++  void Tick() {
++    if (!rwh_) {
++      Finish();
++      return;
++    }
++    if (index_ < path_.size()) {
++      Dispatch(blink::WebInputEvent::Type::kMouseMove, path_[index_]);
++      UpdateOverlay(path_[index_]);
++      ++index_;
++      // Schedule next with ±5% timing jitter.
++      const double jitter_factor =
++          1.0 + Gauss(0.05, 0.20);  // up to ±20% clamped
++      const base::TimeDelta next_dt =
++          base::Microseconds(static_cast<int64_t>(
++              step_dt_.InMicroseconds() * std::max(0.5, jitter_factor)));
++      timer_.Start(FROM_HERE, next_dt,
++                   base::BindOnce(&HumanizedClickRunner::Tick,
++                                  base::Unretained(this)));
++      return;
++    }
++    // Path exhausted. Maybe click, then finish.
++    if (!no_click_) {
++      Dispatch(blink::WebInputEvent::Type::kMouseDown, target_);
++      // Human dwell 40–110 ms.
++      const base::TimeDelta dwell =
++          base::Milliseconds(40 + static_cast<int>(base::RandDouble() * 70));
++      timer_.Start(FROM_HERE, dwell,
++                   base::BindOnce(&HumanizedClickRunner::Release,
++                                  base::Unretained(this)));
++      return;
++    }
++    Finish();
++  }
++
++  void Release() {
++    if (rwh_) {
++      Dispatch(blink::WebInputEvent::Type::kMouseUp, target_);
++    }
++    Finish();
++  }
++
++  void Dispatch(blink::WebInputEvent::Type type, gfx::PointF point) {
++    blink::WebMouseEvent event(type, blink::WebInputEvent::kNoModifiers,
++                               ui::EventTimeForNow());
++    event.SetPositionInWidget(point.x(), point.y());
++    event.SetPositionInScreen(point.x(), point.y());
++    event.button = blink::WebMouseEvent::Button::kLeft;
++    event.click_count = (type == blink::WebInputEvent::Type::kMouseDown ||
++                         type == blink::WebInputEvent::Type::kMouseUp)
++                            ? 1
++                            : 0;
++    // No kFromDebugger marker — we want this to look like real input.
++    //
++    // Route via the cross-process input event router so that points that
++    // hit-test into a cross-origin (OOPIF) iframe are forwarded to the
++    // iframe's own renderer. Without this, ForwardMouseEvent would post
++    // the event directly to the parent renderer, which would deliver it
++    // to the parent's <iframe> element node but never cross the process
++    // boundary into the embedded frame — so clicks on cross-origin
++    // iframes would silently do nothing. Falls back to the direct path
++    // if there's no router (e.g. embedded views without a delegate).
++    RenderWidgetHostViewBase* root_view =
++        rwh_->GetView() ? static_cast<RenderWidgetHostViewBase*>(rwh_->GetView())
++                        : nullptr;
++    input::RenderWidgetHostInputEventRouter* router =
++        rwh_->delegate() ? rwh_->delegate()->GetInputEventRouter() : nullptr;
++    if (root_view && router) {
++      ui::LatencyInfo latency_info;
++      latency_info.AddLatencyNumber(ui::INPUT_EVENT_LATENCY_UI_COMPONENT);
++      router->RouteMouseEvent(root_view, &event, latency_info);
++    } else {
++      rwh_->ForwardMouseEvent(event);
++    }
++  }
++
++  void Finish() {
++#if BUILDFLAG(IS_MAC)
++    if (overlay_visible_) {
++      // Let the ring sit at the target for ~1.5s so the user can actually
++      // see where the click landed. Without this delay, HideCursorOverlay
++      // would run as soon as the click sequence finishes (via Finish()), so
++      // the ring could vanish within a frame or two of the user noticing it.
++      // ScheduleFinishAfterLinger keeps `this` alive long enough for the
++      // linger then tears down.
++      ScheduleFinishAfterLinger();
++      return;
++    }
++#endif
++    DoFinish();
++  }
++
++  void ScheduleFinishAfterLinger() {
++    constexpr base::TimeDelta kLinger = base::Milliseconds(1500);
++    timer_.Start(FROM_HERE, kLinger,
++                 base::BindOnce(&HumanizedClickRunner::FinishAfterLinger,
++                                base::Unretained(this)));
++  }
++
++  void FinishAfterLinger() {
++#if BUILDFLAG(IS_MAC)
++    if (overlay_visible_) {
++      devtools::HideCursorOverlay();
++      overlay_visible_ = false;
++    }
++#endif
++    DoFinish();
++  }
++
++  void DoFinish() {
++    if (callback_) {
++      callback_->sendSuccess();
++    }
++    delete this;
++  }
++
++  base::WeakPtr<RenderWidgetHostImpl> rwh_;
++  base::WeakPtr<WebContents> web_contents_;
++  gfx::PointF target_;
++  bool no_click_;
++  bool visualize_;
++  std::vector<gfx::PointF> path_;
++  size_t index_ = 0;
++  base::TimeDelta step_dt_;
++  base::OneShotTimer timer_;
++  CallbackPtr callback_;
++  bool overlay_visible_ = false;
++};
++
++}  // namespace
++
++void BrowserHandler::HumanizedClick(
++    const std::string& in_target_id,
++    double in_x,
++    double in_y,
++    std::optional<double> in_duration,
++    std::optional<bool> in_no_click,
++    std::optional<bool> in_visualize,
++    std::unique_ptr<HumanizedClickCallback> callback) {
++  scoped_refptr<DevToolsAgentHost> host =
++      DevToolsAgentHost::GetForId(in_target_id);
++  if (!host) {
++    callback->sendFailure(
++        Response::InvalidParams("No target with given targetId"));
++    return;
++  }
++  WebContents* web_contents = host->GetWebContents();
++  if (!web_contents) {
++    callback->sendFailure(
++        Response::InvalidParams("Target has no WebContents"));
++    return;
++  }
++  RenderWidgetHost* rwh = web_contents->GetRenderWidgetHostView()
++                              ? web_contents->GetRenderWidgetHostView()
++                                    ->GetRenderWidgetHost()
++                              : nullptr;
++  if (!rwh) {
++    callback->sendFailure(Response::ServerError("No active RenderWidgetHost"));
++    return;
++  }
++  HumanizedClickRunner::Start(
++      static_cast<RenderWidgetHostImpl*>(rwh)->GetWeakPtr(),
++      web_contents->GetWeakPtr(),
++      gfx::PointF(static_cast<float>(in_x), static_cast<float>(in_y)),
++      in_duration.value_or(0.6), in_no_click.value_or(false),
++      in_visualize.value_or(false),
++      std::move(callback));
++}
++
++void BrowserHandler::AgentRunTask(
++    const std::string& in_target_id,
++    const std::string& in_goal,
++    std::optional<int> in_max_steps,
++    std::optional<std::string> in_model,
++    std::optional<std::string> in_plan_json,
++    std::unique_ptr<AgentRunTaskCallback> callback) {
++  scoped_refptr<DevToolsAgentHost> host =
++      DevToolsAgentHost::GetForId(in_target_id);
++  if (!host) {
++    callback->sendFailure(
++        Response::InvalidParams("No target with given targetId"));
++    return;
++  }
++  WebContents* web_contents = host->GetWebContents();
++  if (!web_contents) {
++    callback->sendFailure(
++        Response::InvalidParams("Target has no WebContents"));
++    return;
++  }
++  WebContentsDelegate* delegate = web_contents->GetDelegate();
++  if (!delegate) {
++    callback->sendFailure(Response::ServerError("Target has no delegate"));
++    return;
++  }
++  // The agent loop is owned by the chrome layer (Browser, via the delegate);
++  // content/ cannot depend on chrome/. Forward and answer the async callback
++  // when the task completes.
++  delegate->RunAgentTask(
++      web_contents, in_goal, in_max_steps.value_or(20),
++      in_model.value_or(std::string()), in_plan_json.value_or(std::string()),
++      base::BindOnce(
++          [](std::unique_ptr<AgentRunTaskCallback> cb, bool success,
++             const std::string& final_text, const std::string& steps_json) {
++            cb->sendSuccess(success, final_text, steps_json);
++          },
++          std::move(callback)));
++}
++
++namespace {
++
++// Build a JS expression that returns [x, y] of the element's center, or null
++// if the element doesn't exist. selector is interpolated as a JSON string
++// literal so quotes/backslashes in the user's input are properly escaped.
++std::u16string BuildResolveSelectorScript(const std::string& selector) {
++  // Crude JSON-escape — good enough since selectors are short and ASCII-ish.
++  std::string escaped;
++  escaped.reserve(selector.size() + 8);
++  for (char c : selector) {
++    switch (c) {
++      case '\\': escaped += "\\\\"; break;
++      case '"':  escaped += "\\\""; break;
++      case '\n': escaped += "\\n";  break;
++      case '\r': escaped += "\\r";  break;
++      case '\t': escaped += "\\t";  break;
++      default:
++        if (static_cast<unsigned char>(c) < 0x20) {
++          char buf[8];
++          snprintf(buf, sizeof(buf), "\\u%04x", c);
++          escaped += buf;
++        } else {
++          escaped += c;
++        }
++    }
++  }
++  std::string js =
++      "(()=>{try{const e=document.querySelector(\"" + escaped +
++      "\");if(!e)return null;const r=e.getBoundingClientRect();"
++      "return [r.left+r.width/2, r.top+r.height/2];}catch(e){return null;}})()";
++  return std::u16string(js.begin(), js.end());
++}
++
++}  // namespace
++
++void BrowserHandler::HumanizedClickSelector(
++    const std::string& in_target_id,
++    const std::string& in_selector,
++    std::optional<double> in_duration,
++    std::optional<bool> in_no_click,
++    std::optional<bool> in_visualize,
++    std::unique_ptr<HumanizedClickSelectorCallback> callback) {
++  scoped_refptr<DevToolsAgentHost> host =
++      DevToolsAgentHost::GetForId(in_target_id);
++  if (!host) {
++    callback->sendFailure(
++        Response::InvalidParams("No target with given targetId"));
++    return;
++  }
++  WebContents* web_contents = host->GetWebContents();
++  if (!web_contents) {
++    callback->sendFailure(
++        Response::InvalidParams("Target has no WebContents"));
++    return;
++  }
++  RenderFrameHost* rfh = web_contents->GetPrimaryMainFrame();
++  if (!rfh) {
++    callback->sendFailure(Response::ServerError("No primary main frame"));
++    return;
++  }
++
++  // Capture the bits the callback needs. WebContents pointer is captured raw
++  // and re-validated through DevToolsAgentHost in the callback.
++  std::string target_id = in_target_id;
++  double duration = in_duration.value_or(0.6);
++  bool no_click = in_no_click.value_or(false);
++  bool visualize = in_visualize.value_or(false);
++  auto cb_shared = std::make_shared<
++      std::unique_ptr<HumanizedClickSelectorCallback>>(std::move(callback));
++
++  rfh->ExecuteJavaScriptInIsolatedWorld(
++      BuildResolveSelectorScript(in_selector),
++      base::BindOnce(
++          [](std::string target_id, double duration, bool no_click,
++             bool visualize,
++             std::shared_ptr<std::unique_ptr<HumanizedClickSelectorCallback>>
++                 cb_shared,
++             base::Value result) {
++            auto& cb = *cb_shared;
++            if (!cb) return;
++            if (!result.is_list() || result.GetList().size() != 2) {
++              cb->sendFailure(Response::ServerError(
++                  "Selector did not match an element"));
++              return;
++            }
++            double x = result.GetList()[0].GetDouble();
++            double y = result.GetList()[1].GetDouble();
++
++            // Re-resolve the target — page may have navigated between calls.
++            scoped_refptr<DevToolsAgentHost> host =
++                DevToolsAgentHost::GetForId(target_id);
++            WebContents* wc = host ? host->GetWebContents() : nullptr;
++            RenderWidgetHost* rwh =
++                wc && wc->GetRenderWidgetHostView()
++                    ? wc->GetRenderWidgetHostView()->GetRenderWidgetHost()
++                    : nullptr;
++            if (!rwh) {
++              cb->sendFailure(
++                  Response::ServerError("Target disappeared during resolve"));
++              return;
++            }
++
++            // Bridge: when the runner finishes its HumanizedClickCallback,
++            // surface the result as the Selector-specific callback with x/y.
++            class BridgeCallback
++                : public BrowserHandler::HumanizedClickCallback {
++             public:
++              BridgeCallback(
++                  std::unique_ptr<HumanizedClickSelectorCallback> sel_cb,
++                  double x, double y)
++                  : sel_cb_(std::move(sel_cb)), x_(x), y_(y) {}
++              void sendSuccess() override {
++                sel_cb_->sendSuccess(x_, y_);
++              }
++              void sendFailure(const ::content::protocol::DispatchResponse& r)
++                  override {
++                sel_cb_->sendFailure(r);
++              }
++              void fallThrough() override { sel_cb_->fallThrough(); }
++             private:
++              std::unique_ptr<HumanizedClickSelectorCallback> sel_cb_;
++              double x_, y_;
++            };
++            auto bridge =
++                std::make_unique<BridgeCallback>(std::move(cb), x, y);
++            HumanizedClickRunner::Start(
++                static_cast<RenderWidgetHostImpl*>(rwh)->GetWeakPtr(),
++                wc->GetWeakPtr(),
++                gfx::PointF(static_cast<float>(x), static_cast<float>(y)),
++                duration, no_click, visualize, std::move(bridge));
++          },
++          std::move(target_id), duration, no_click, visualize, cb_shared),
++      // Pick a world ID within the valid range (CONTENT_END..MAX = 1..11).
++      // 10 is high enough to avoid Chrome's internal worlds 2-5.
++      10);
++}
++
+ void BrowserHandler::AddPrivacySandboxCoordinatorKeyConfig(
+     const std::string& in_api,
+     const std::string& in_coordinator_origin,
+diff --git a/content/browser/devtools/protocol/browser_handler.h b/content/browser/devtools/protocol/browser_handler.h
+index 916cdc7f05134..b407eac7a3902 100644
+--- a/content/browser/devtools/protocol/browser_handler.h
++++ b/content/browser/devtools/protocol/browser_handler.h
+@@ -101,6 +101,29 @@ class BrowserHandler : public DevToolsDomainHandler,
+   Response Crash() override;
+   Response CrashGpuProcess() override;
+ 
++  // Lightweight-fork: humanized click via internal WebMouseEvent dispatch.
++  void HumanizedClick(const std::string& in_target_id,
++                      double in_x,
++                      double in_y,
++                      std::optional<double> in_duration,
++                      std::optional<bool> in_no_click,
++                      std::optional<bool> in_visualize,
++                      std::unique_ptr<HumanizedClickCallback> callback) override;
++  void HumanizedClickSelector(
++      const std::string& in_target_id,
++      const std::string& in_selector,
++      std::optional<double> in_duration,
++      std::optional<bool> in_no_click,
++      std::optional<bool> in_visualize,
++      std::unique_ptr<HumanizedClickSelectorCallback> callback) override;
++  // ChromiumFish: native in-browser AI agent task (see Browser.agentRunTask).
++  void AgentRunTask(const std::string& in_target_id,
++                    const std::string& in_goal,
++                    std::optional<int> in_max_steps,
++                    std::optional<std::string> in_model,
++                    std::optional<std::string> in_plan_json,
++                    std::unique_ptr<AgentRunTaskCallback> callback) override;
++
+   void AddPrivacySandboxCoordinatorKeyConfig(
+       const std::string& in_api,
+       const std::string& in_coordinator_origin,
 diff --git a/content/browser/devtools/protocol/humanized_cursor_overlay_mac.h b/content/browser/devtools/protocol/humanized_cursor_overlay_mac.h
 new file mode 100644
 index 0000000000000..edde69ca4ef80
@@ -3460,6 +5749,159 @@ index 0000000000000..99ef9592c9c8a
 +
 +}  // namespace devtools
 +}  // namespace content
+diff --git a/content/browser/devtools/protocol/input_handler.cc b/content/browser/devtools/protocol/input_handler.cc
+index 9364acb5ca137..f9f104f2de9b9 100644
+--- a/content/browser/devtools/protocol/input_handler.cc
++++ b/content/browser/devtools/protocol/input_handler.cc
+@@ -48,6 +48,8 @@
+ #include "ui/base/clipboard/clipboard_constants.h"
+ #include "ui/base/dragdrop/mojom/drag_drop_types.mojom-shared.h"
+ #include "ui/events/base_event_utils.h"
++#include "base/rand_util.h"
++#include "content/browser/renderer_host/render_widget_host_impl.h"
+ #include "ui/events/blink/web_input_event_traits.h"
+ #include "ui/events/event_constants.h"
+ #include "ui/events/gesture_detection/gesture_provider_config_helper.h"
+@@ -1353,6 +1355,37 @@ void InputHandler::ImeSetComposition(
+       std::move(closure));
+ }
+ 
++namespace {
++
++// Cubic bezier with control points biased perpendicular to the straight line.
++gfx::PointF HumanizeCubicBezier(gfx::PointF p0,
++                                gfx::PointF p1,
++                                gfx::PointF p2,
++                                gfx::PointF p3,
++                                double t) {
++  const double u = 1.0 - t;
++  return gfx::PointF(
++      u * u * u * p0.x() + 3 * u * u * t * p1.x() + 3 * u * t * t * p2.x() +
++          t * t * t * p3.x(),
++      u * u * u * p0.y() + 3 * u * u * t * p1.y() + 3 * u * t * t * p2.y() +
++          t * t * t * p3.y());
++}
++
++double HumanizeEaseInOut(double t) { return t * t * (3.0 - 2.0 * t); }
++
++double HumanizeGauss(double sigma, double clamp_abs) {
++  if (sigma <= 0) return 0.0;
++  const double u1 = std::max(1e-9, base::RandDouble());
++  const double u2 = base::RandDouble();
++  const double z = std::sqrt(-2.0 * std::log(u1)) * std::cos(2.0 * M_PI * u2);
++  return std::clamp(z * sigma, -clamp_abs, clamp_abs);
++}
++
++constexpr double kHumanizeDuration = 0.5;       // seconds
++constexpr int kHumanizeSamplesPerSec = 120;
++
++}  // namespace
++
+ void InputHandler::DispatchMouseEvent(
+     const std::string& event_type,
+     double x,
+@@ -1371,6 +1404,64 @@ void InputHandler::DispatchMouseEvent(
+     std::optional<double> delta_y,
+     std::optional<std::string> pointer_type,
+     std::unique_ptr<DispatchMouseEventCallback> callback) {
++  // Lightweight-fork: when a mousePressed comes in, prepend a humanized
++  // bezier-curve motion from the last known cursor position to (x, y) before
++  // dispatching the press. Other event types pass through with cursor tracking.
++  const bool is_press = (event_type == "mousePressed");
++  const bool is_move = (event_type == "mouseMoved");
++  const gfx::PointF target(static_cast<float>(x), static_cast<float>(y));
++
++  if (is_press) {
++    const gfx::PointF start = last_cursor_position_;
++    const double dx = target.x() - start.x();
++    const double dy = target.y() - start.y();
++    const double dist = std::hypot(dx, dy);
++    if (dist >= 0.5) {
++      // Bow the path perpendicular to the straight line.
++      const double px = -dy / dist;
++      const double py = dx / dist;
++      const double bow1 = (base::RandDouble() * 0.30 - 0.15) * dist;
++      const double bow2 = (base::RandDouble() * 0.30 - 0.15) * dist;
++      const gfx::PointF cp1(start.x() + dx * 0.33 + px * bow1,
++                            start.y() + dy * 0.33 + py * bow1);
++      const gfx::PointF cp2(start.x() + dx * 0.66 + px * bow2,
++                            start.y() + dy * 0.66 + py * bow2);
++
++      const int steps = std::max(
++          8, static_cast<int>(kHumanizeDuration * kHumanizeSamplesPerSec));
++
++      // Pre-dispatch every move synchronously; we don't need timer-driven
++      // pacing for renderer event coalescing — the renderer treats them as
++      // ordered events. We DO need the press to fire after all moves so that
++      // pointerover/pointerenter resolve before pointerdown.
++      auto fire_move = [&](gfx::PointF p) {
++        auto mv = std::make_unique<blink::WebMouseEvent>(
++            blink::WebInputEvent::Type::kMouseMove,
++            blink::WebInputEvent::kNoModifiers, ui::EventTimeForNow());
++        mv->SetPositionInWidget(p.x(), p.y());
++        mv->SetPositionInScreen(p.x(), p.y());
++        mv->button = blink::WebMouseEvent::Button::kNoButton;
++        RenderWidgetHostImpl* widget_host =
++            host_ ? host_->GetRenderWidgetHost() : nullptr;
++        if (widget_host) {
++          widget_host->ForwardMouseEvent(*mv);
++        }
++      };
++      for (int i = 1; i <= steps; ++i) {
++        const double t = HumanizeEaseInOut(static_cast<double>(i) / steps);
++        gfx::PointF p = HumanizeCubicBezier(start, cp1, cp2, target, t);
++        p.set_x(static_cast<float>(p.x() + HumanizeGauss(0.4, 2.0)));
++        p.set_y(static_cast<float>(p.y() + HumanizeGauss(0.4, 2.0)));
++        fire_move(p);
++      }
++      // Exact landing without jitter so the press is at the requested coords.
++      fire_move(target);
++    }
++    last_cursor_position_ = target;
++  } else if (is_move) {
++    last_cursor_position_ = target;
++  }
++
+   base::expected<std::unique_ptr<blink::WebMouseEvent>, protocol::Response>
+       maybe_event = CreateWebMouseEvent(
+           event_type, x, y, ScaleFactor(), std::move(modifiers),
+diff --git a/content/browser/devtools/protocol/input_handler.h b/content/browser/devtools/protocol/input_handler.h
+index 4c25a8c1c26c3..2e4fb7298bf18 100644
+--- a/content/browser/devtools/protocol/input_handler.h
++++ b/content/browser/devtools/protocol/input_handler.h
+@@ -16,6 +16,7 @@
+ #include "base/memory/raw_ptr.h"
+ #include "base/memory/raw_ref.h"
+ #include "base/memory/weak_ptr.h"
++#include "ui/gfx/geometry/point_f.h"
+ #include "content/browser/devtools/protocol/devtools_domain_handler.h"
+ #include "content/browser/devtools/protocol/input.h"
+ #include "content/browser/renderer_host/render_widget_host_view_base.h"
+@@ -356,6 +357,9 @@ class InputHandler : public DevToolsDomainHandler, public Input::Backend {
+       injectors_;
+   int last_id_ = 0;
+   bool ignore_input_events_ = false;
++  // Lightweight-fork: per-session cursor state used to humanize the motion
++  // before each mousePressed event. Updated on every mouseMoved/mousePressed.
++  gfx::PointF last_cursor_position_;
+   std::optional<content::WebContents::ScopedIgnoreInputEvents>
+       scoped_ignore_input_events_;
+   bool intercept_drags_ = false;
+diff --git a/content/browser/devtools/protocol_config.json b/content/browser/devtools/protocol_config.json
+index bd0f75dee534f..822db982542b0 100644
+--- a/content/browser/devtools/protocol_config.json
++++ b/content/browser/devtools/protocol_config.json
+@@ -20,8 +20,8 @@
+             {
+                 "domain": "Browser",
+                 "include": ["getVersion", "getHistograms", "getHistogram", "getBrowserCommandLine", "grantPermissions", "setDownloadBehavior", "cancelDownload", "resetPermissions", "crash", "crashGpuProcess", "setPermission",
+-                "addPrivacySandboxCoordinatorKeyConfig"],
+-                "async": ["addPrivacySandboxCoordinatorKeyConfig", "grantPermissions", "resetPermissions", "setPermission"]
++                "addPrivacySandboxCoordinatorKeyConfig", "humanizedClick", "humanizedClickSelector", "agentRunTask"],
++                "async": ["addPrivacySandboxCoordinatorKeyConfig", "grantPermissions", "resetPermissions", "setPermission", "humanizedClick", "humanizedClickSelector", "agentRunTask"]
+             },
+             {
+                 "domain": "DOM",
 diff --git a/content/browser/gpu/gpu_data_manager_impl_private.cc b/content/browser/gpu/gpu_data_manager_impl_private.cc
 index 97e9f0acbd34f..e0aa15c873442 100644
 --- a/content/browser/gpu/gpu_data_manager_impl_private.cc
@@ -3733,7 +6175,7 @@ index 0000000000000..67cfe67266258
 +
 +}  // namespace content
 diff --git a/content/browser/renderer_host/render_process_host_impl.cc b/content/browser/renderer_host/render_process_host_impl.cc
-index 2e1c77eaaca9a..790bba1e18873 100644
+index 2e1c77eaaca9a..6cd8c54b57f3b 100644
 --- a/content/browser/renderer_host/render_process_host_impl.cc
 +++ b/content/browser/renderer_host/render_process_host_impl.cc
 @@ -71,6 +71,7 @@
@@ -3748,7 +6190,7 @@ index 2e1c77eaaca9a..790bba1e18873 100644
        switches::kDisableVideoCaptureUseGpuMemoryBuffer,
        switches::kDomAutomationController,
        switches::kEnableAutomation,
-+      // MetaChat: 转发 --persona-seed 给渲染进程
++      // MetaChat: forward --persona-seed to renderer
 +      // 渲染进程通过 kPersonaSeed 生成确定的指纹面具
 +      switches::kPersonaSeed,
        switches::kEnableExperimentalAccessibilityLanguageDetection,
@@ -3760,12 +6202,12 @@ index 2e1c77eaaca9a..790bba1e18873 100644
  #endif
 +      canvas_bridge::switches::kCanvasBridgeUrl,
 +      canvas_bridge::switches::kCanvasBridgeAuth,
-+      // MetaChat: 转发 --persona-os 给渲染进程
++      // MetaChat: forward --persona-os to renderer
 +      // fingerprint_profile.cc 根据此值读取操作系统指纹配置
 +      "persona-os",
    };
    renderer_cmd->CopySwitchesFrom(browser_cmd, kSwitchNames);
-+  // MetaChat: DVLOG - 记录已转发的指纹种子
++  // MetaChat: DVLOG - log forwarded fingerprint seed
 +  DVLOG(1) << "MetaChat: persona-seed="
 +           << browser_cmd->GetSwitchValueASCII(switches::kPersonaSeed)
 +           << " persona-os="
@@ -3773,6 +6215,18 @@ index 2e1c77eaaca9a..790bba1e18873 100644
  
    // |switches::kGaiaConfig| can be set via browser command-line arguments,
    // usually by developers working on signin code. The switch, however, cannot
+diff --git a/content/public/browser/BUILD.gn b/content/public/browser/BUILD.gn
+index c2e8a8be4e66c..1125bc7935750 100644
+--- a/content/public/browser/BUILD.gn
++++ b/content/public/browser/BUILD.gn
+@@ -216,6 +216,7 @@ source_set("browser_sources") {
+     "hid_delegate.h",
+     "histogram_fetcher.h",
+     "host_zoom_map.h",
++    "humanized_click.h",
+     "installability_error.cc",
+     "installability_error.h",
+     "installed_payment_apps_finder.h",
 diff --git a/content/public/browser/humanized_click.h b/content/public/browser/humanized_click.h
 new file mode 100644
 index 0000000000000..4bec45f9b44d4
@@ -3827,6 +6281,57 @@ index 0000000000000..4bec45f9b44d4
 +}  // namespace content
 +
 +#endif  // CONTENT_PUBLIC_BROWSER_HUMANIZED_CLICK_H_
+diff --git a/content/public/browser/web_contents_delegate.cc b/content/public/browser/web_contents_delegate.cc
+index 16244802d3c31..69981c7e87a5a 100644
+--- a/content/public/browser/web_contents_delegate.cc
++++ b/content/public/browser/web_contents_delegate.cc
+@@ -476,6 +476,19 @@ void WebContentsDelegate::GetAIPageContent(
+   std::move(callback).Run(std::string());
+ }
+ 
++void WebContentsDelegate::RunAgentTask(
++    WebContents* web_contents,
++    const std::string& goal,
++    int max_steps,
++    const std::string& model,
++    const std::string& plan_json,
++    base::OnceCallback<void(bool success,
++                            const std::string& final_text,
++                            const std::string& steps_json)>
++        callback) {
++  std::move(callback).Run(false, "agent not supported by this delegate", "[]");
++}
++
+ bool WebContentsDelegate::IsWaitingForPointerLockPrompt(
+     WebContents* web_contents) {
+   return false;
+diff --git a/content/public/browser/web_contents_delegate.h b/content/public/browser/web_contents_delegate.h
+index 01caa48d282c0..041ac53bf435f 100644
+--- a/content/public/browser/web_contents_delegate.h
++++ b/content/public/browser/web_contents_delegate.h
+@@ -897,6 +897,22 @@ class CONTENT_EXPORT WebContentsDelegate {
+       bool include_actionable_elements,
+       base::OnceCallback<void(const std::string&)> callback);
+ 
++  // ChromiumFish: runs a native, in-browser AI agent task against
++  // `web_contents` toward `goal` (natural language), driven by a configured
++  // OpenAI-compatible LLM. `callback` reports completion with a success flag
++  // and a final human-readable message. The default implementation reports
++  // "unsupported"; the chrome-layer delegate (Browser) implements it.
++  virtual void RunAgentTask(
++      WebContents* web_contents,
++      const std::string& goal,
++      int max_steps,
++      const std::string& model,
++      const std::string& plan_json,
++      base::OnceCallback<void(bool success,
++                              const std::string& final_text,
++                              const std::string& steps_json)>
++          callback);
++
+ #if BUILDFLAG(IS_ANDROID)
+   // Allow delegate to override how to take a snapshot of this WebContents into
+   // a HardwareBuffer. Return true if the delegate will execute callback with a
 diff --git a/content/public/common/content_features.cc b/content/public/common/content_features.cc
 index dd7b9aa06b988..0359b4b2d6811 100644
 --- a/content/public/common/content_features.cc
@@ -3926,6 +6431,19 @@ index 307f596f3e017..70291535ba09f 100644
  
    // The compliance policy must be the last thing configured in order to have
    // defined behavior.
+diff --git a/third_party/blink/common/BUILD.gn b/third_party/blink/common/BUILD.gn
+index 6f48104544022..ca1df0809b316 100644
+--- a/third_party/blink/common/BUILD.gn
++++ b/third_party/blink/common/BUILD.gn
+@@ -148,6 +148,8 @@ source_set("common") {
+     "fenced_frame/redacted_fenced_frame_config.cc",
+     "fenced_frame/redacted_fenced_frame_config_mojom_traits.cc",
+     "fetch/fetch_api_request_body_mojom_traits.cc",
++    "fingerprinting/fingerprint_audio_isolation.cc",
++    "fingerprinting/fingerprint_profile.cc",
+     "frame/delegated_capability_request_token.cc",
+     "frame/frame_ad_evidence.cc",
+     "frame/frame_ad_evidence_mojom_traits.cc",
 diff --git a/third_party/blink/common/features.cc b/third_party/blink/common/features.cc
 index 594cd59a601c2..3ad9dd4c20499 100644
 --- a/third_party/blink/common/features.cc
@@ -4472,6 +6990,20 @@ index 0000000000000..0a6d590bb4ae1
 +}
 +
 +}  // namespace blink::fingerprinting
+diff --git a/third_party/blink/public/common/BUILD.gn b/third_party/blink/public/common/BUILD.gn
+index 15ef3766c1593..fc9807c1a3a68 100644
+--- a/third_party/blink/public/common/BUILD.gn
++++ b/third_party/blink/public/common/BUILD.gn
+@@ -147,6 +147,9 @@ source_set("headers") {
+     "fenced_frame/redacted_fenced_frame_config_mojom_traits.h",
+     "fetch/fetch_api_request_headers_map.h",
+     "fetch/fetch_api_request_headers_mojom_traits.h",
++    "fingerprinting/fingerprint_audio_isolation.h",
++    "fingerprinting/fingerprint_profile.h",
++    "fingerprinting/font_allowlist.h",
+     "fingerprinting_protection/noise_token.h",
+     "fingerprinting_protection/noise_token_mojom_traits.h",
+     "frame/delegated_capability_request_token.h",
 diff --git a/third_party/blink/public/common/fingerprinting/fingerprint_profile.h b/third_party/blink/public/common/fingerprinting/fingerprint_profile.h
 new file mode 100644
 index 0000000000000..d238b57919ea0
@@ -4889,6 +7421,86 @@ index 0000000000000..5d103848c209b
 +}  // namespace blink::fingerprinting
 +
 +#endif  // THIRD_PARTY_BLINK_PUBLIC_COMMON_FINGERPRINTING_FONT_ALLOWLIST_H_
+diff --git a/third_party/blink/public/devtools_protocol/domains/Browser.pdl b/third_party/blink/public/devtools_protocol/domains/Browser.pdl
+index 6015a94554c21..49e950d3f8f98 100644
+--- a/third_party/blink/public/devtools_protocol/domains/Browser.pdl
++++ b/third_party/blink/public/devtools_protocol/domains/Browser.pdl
+@@ -350,3 +350,75 @@ domain Browser
+       # BrowserContext to perform the action in. When omitted, default browser
+       # context is used.
+       optional BrowserContextID browserContextId
++
++  # Lightweight-fork: dispatch a humanized mouse click to a target.
++  #
++  # Moves the renderer's mouse cursor along a cubic-bezier path with timing
++  # jitter from the LAST KNOWN mouse position to (x, y) in CSS viewport coords,
++  # then issues mousePressed + mouseReleased. All events flow through the
++  # standard CDP input path, so receiving renderers see
++  # MouseEvent.isTrusted === true.
++  #
++  # The method is browser-level (no page debugger attach required) so
++  # navigator.webdriver stays false.
++  experimental command humanizedClick
++    parameters
++      # The target page to click on. Get via Target.getTargets.
++      string targetId
++      # CSS-pixel viewport coordinates within the target.
++      number x
++      number y
++      # Total travel time in seconds (default 0.6).
++      optional number duration
++      # If true, perform only the move (no press/release). Default false.
++      optional boolean noClick
++      # If true, draw a red overlay ring at every interpolated cursor
++      # position along the path so the user can see the trajectory.
++      # Mac-only (uses humanized_cursor_overlay_mac's borderless child
++      # NSWindow); silently ignored on other platforms. Default false.
++      optional boolean visualize
++
++  # Like humanizedClick, but resolves the element's center coords by CSS
++  # selector inside the page first. Browser-side resolution — caller doesn't
++  # need to compute bounds.
++  experimental command humanizedClickSelector
++    parameters
++      string targetId
++      # CSS selector. First matching element is used. Fails if no match.
++      string selector
++      optional number duration
++      optional boolean noClick
++      optional boolean visualize
++    returns
++      # Resolved CSS viewport coordinates the click landed on.
++      number x
++      number y
++
++  # ChromiumFish: run a native in-browser AI agent task. Drives Chrome's Actor
++  # framework + AIPageContent with a configured OpenAI-compatible LLM (see the
++  # --agent-llm-url/--agent-llm-key/--agent-model switches). Async: resolves
++  # when the task completes or the step budget is exhausted.
++  experimental command agentRunTask
++    parameters
++      # The target page to run the agent on. Get via Target.getTargets.
++      string targetId
++      # Natural-language task goal.
++      string goal
++      # Max think/act steps before giving up (default 20).
++      optional integer maxSteps
++      # Override the configured default model (e.g. an OpenRouter slug).
++      optional string model
++      # Optional JSON array of previously-recorded steps to REPLAY (the flow
++      # cache). Each step's {role,name,ordinal} target descriptor is re-resolved
++      # against the live page and dispatched without the LLM; a step that no
++      # longer matches is healed via the LLM and replay continues. Omit/empty to
++      # run fresh (and record).
++      optional string planJson
++    returns
++      # Whether the agent reported the task as successfully completed.
++      boolean success
++      # Final human-readable message from the agent.
++      string finalText
++      # JSON array of the resolved/executed steps, each tagged
++      # recorded|replayed|healed. Persist this as the flow's plan for replay.
++      string stepsJson
 diff --git a/third_party/blink/renderer/bindings/core/v8/local_window_proxy.cc b/third_party/blink/renderer/bindings/core/v8/local_window_proxy.cc
 index a3f5649de4219..0c15b1a2bf599 100644
 --- a/third_party/blink/renderer/bindings/core/v8/local_window_proxy.cc
@@ -4946,6 +7558,39 @@ index a3f5649de4219..0c15b1a2bf599 100644
    if (World().IsMainWorld()) {
      probe::DidCreateMainWorldContext(GetFrame());
      GetFrame()->Loader().DispatchDidClearWindowObjectInMainWorld();
+diff --git a/third_party/blink/renderer/controller/blink_initializer.cc b/third_party/blink/renderer/controller/blink_initializer.cc
+index 4d1f2acf58e43..92ace9029b594 100644
+--- a/third_party/blink/renderer/controller/blink_initializer.cc
++++ b/third_party/blink/renderer/controller/blink_initializer.cc
+@@ -30,6 +30,9 @@
+ 
+ #include "third_party/blink/renderer/controller/blink_initializer.h"
+ 
++// Lightweight-fork: needed for pre-warm Get() call below.
++#include "third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.h"
++
+ #include <algorithm>
+ #include <memory>
+ #include <utility>
+@@ -169,6 +172,18 @@ void InitializeCommon(Platform* platform, mojo::BinderMap* binders) {
+   // Initialize performance manager.
+   RendererResourceCoordinatorImpl::MaybeInitialize();
+ 
++  // Lightweight-fork: pre-warm the canvas-bridge client so its TCP +
++  // WebSocket connect (~500-700ms to remote Win VPS) happens during
++  // renderer startup instead of on the first canvas op. Without this
++  // pre-warm, canvas ops on the first page fire at ~50-200ms after page
++  // load — well before the bridge finishes its handshake — so they bail
++  // out with "bridge not enabled" and render locally with Mac Skia,
++  // defeating the entire bridge architecture. Calling Get() here
++  // triggers the singleton's StartUp() which kicks off the async
++  // connect on a dedicated I/O thread. By the time a page actually
++  // renders a canvas, the bridge should be in kReady state.
++  blink::canvas_bridge::CanvasBridgeClient::Get();
++
+   // The ArrayBuffer partition is placed inside V8's virtual memory cage if it
+   // is enabled. For that reason, the partition can only be initialized after V8
+   // has been initialized.
 diff --git a/third_party/blink/renderer/core/css/media_values.cc b/third_party/blink/renderer/core/css/media_values.cc
 index 0d60244742506..9d088eaf60da8 100644
 --- a/third_party/blink/renderer/core/css/media_values.cc
@@ -8371,6 +11016,18 @@ index 9d155705c1350..73fc3d7b59b54 100644
  }
  
  const String& GPUAdapterInfo::device() const {
+diff --git a/third_party/blink/renderer/platform/BUILD.gn b/third_party/blink/renderer/platform/BUILD.gn
+index bdc38284d22fd..97c26caabaf57 100644
+--- a/third_party/blink/renderer/platform/BUILD.gn
++++ b/third_party/blink/renderer/platform/BUILD.gn
+@@ -1784,6 +1784,7 @@ component("platform") {
+     "//third_party/blink/public/mojom:color_scheme_mojo_bindings",
+     "//third_party/blink/public/mojom:embedded_frame_sink_mojo_bindings_blink",
+     "//third_party/blink/renderer/platform/blob",
++    "//third_party/blink/renderer/platform/canvas_bridge",
+     "//third_party/blink/renderer/platform/heap",
+     "//third_party/blink/renderer/platform/image-decoders:image_decoders",
+     "//third_party/blink/renderer/platform/instrumentation",
 diff --git a/third_party/blink/renderer/platform/canvas_bridge/BUILD.gn b/third_party/blink/renderer/platform/canvas_bridge/BUILD.gn
 new file mode 100644
 index 0000000000000..62b65070b5302
@@ -10556,6 +13213,224 @@ index 0000000000000..bd571b825fafd
 +}  // namespace blink::canvas_bridge
 +
 +#endif  // THIRD_PARTY_BLINK_RENDERER_PLATFORM_CANVAS_BRIDGE_CANVAS_BRIDGE_CODEC_H_
+diff --git a/third_party/blink/renderer/platform/fonts/alternate_font_family.h b/third_party/blink/renderer/platform/fonts/alternate_font_family.h
+index ab909958f63e2..b6fe82a811e1c 100644
+--- a/third_party/blink/renderer/platform/fonts/alternate_font_family.h
++++ b/third_party/blink/renderer/platform/fonts/alternate_font_family.h
+@@ -101,6 +101,91 @@ inline const AtomicString& AlternateFamilyName(
+     return font_family_names::kArial;
+   }
+ 
++#if BUILDFLAG(IS_MAC)
++  // Lightweight-fork: route Win-typical font-family names to the libre
++  // equivalents installed via tools/activate_lean_fonts.py. Without this,
++  // the fingerprinter's font enumeration probe sees these Win-default fonts as missing
++  // (contradicting our Windows persona). Aliasing to Arial / Courier New /
++  // Times New Roman (which Blink resolves to Arimo / Cousine / Tinos via
++  // CoreText on this host) makes them register as installed. Widths won't
++  // be perfectly Win-accurate, but presence beats absence. Only reached on
++  // alternate-lookup path — Windows natively has these so this branch is
++  // never hit there.
++  // Expanded list — these are the exact font names a real Win11 Chrome
++  // returns from the fingerprinter's font probe (verified via real-hardware capture).
++  // Aliasing them all to one of the three libre families we install via
++  // tools/activate_lean_fonts.py makes them appear "installed" with
++  // metric values that differ from the monospace fallback baseline.
++  // Sans-serif and decorative Win fonts → Arial (resolves to Arimo)
++  if (EqualIgnoringAsciiCase(family_name, "Segoe UI") ||
++      EqualIgnoringAsciiCase(family_name, "Segoe UI Light") ||
++      EqualIgnoringAsciiCase(family_name, "Segoe UI Semibold") ||
++      EqualIgnoringAsciiCase(family_name, "Segoe UI Black") ||
++      EqualIgnoringAsciiCase(family_name, "Segoe UI Symbol") ||
++      EqualIgnoringAsciiCase(family_name, "Segoe UI Emoji") ||
++      EqualIgnoringAsciiCase(family_name, "Tahoma") ||
++      EqualIgnoringAsciiCase(family_name, "Verdana") ||
++      EqualIgnoringAsciiCase(family_name, "Trebuchet MS") ||
++      EqualIgnoringAsciiCase(family_name, "Microsoft Sans Serif") ||
++      EqualIgnoringAsciiCase(family_name, "Arial Black") ||
++      EqualIgnoringAsciiCase(family_name, "Calibri") ||
++      EqualIgnoringAsciiCase(family_name, "Calibri Light") ||
++      EqualIgnoringAsciiCase(family_name, "Candara") ||
++      EqualIgnoringAsciiCase(family_name, "Corbel") ||
++      EqualIgnoringAsciiCase(family_name, "Franklin Gothic") ||
++      EqualIgnoringAsciiCase(family_name, "Franklin Gothic Medium") ||
++      EqualIgnoringAsciiCase(family_name, "Lucida Sans") ||
++      EqualIgnoringAsciiCase(family_name, "Lucida Sans Unicode") ||
++      EqualIgnoringAsciiCase(family_name, "Impact") ||
++      EqualIgnoringAsciiCase(family_name, "Haettenschweiler") ||
++      EqualIgnoringAsciiCase(family_name, "Agency FB") ||
++      EqualIgnoringAsciiCase(family_name, "Century Gothic") ||
++      EqualIgnoringAsciiCase(family_name, "Comic Sans MS") ||
++      EqualIgnoringAsciiCase(family_name, "Leelawadee") ||
++      EqualIgnoringAsciiCase(family_name, "Leelawadee UI") ||
++      EqualIgnoringAsciiCase(family_name, "MS UI Gothic") ||
++      EqualIgnoringAsciiCase(family_name, "MS Gothic") ||
++      EqualIgnoringAsciiCase(family_name, "MS PGothic") ||
++      EqualIgnoringAsciiCase(family_name, "Microsoft Uighur") ||
++      EqualIgnoringAsciiCase(family_name, "Microsoft YaHei") ||
++      EqualIgnoringAsciiCase(family_name, "Microsoft JhengHei") ||
++      EqualIgnoringAsciiCase(family_name, "Yu Gothic") ||
++      EqualIgnoringAsciiCase(family_name, "Malgun Gothic") ||
++      EqualIgnoringAsciiCase(family_name, "Marlett") ||
++      EqualIgnoringAsciiCase(family_name, "MS Reference Specialty") ||
++      EqualIgnoringAsciiCase(family_name, "MS Outlook")) {
++    return font_family_names::kArial;
++  }
++  // Monospace Win fonts → Courier New (resolves to Cousine)
++  if (EqualIgnoringAsciiCase(family_name, "Consolas") ||
++      EqualIgnoringAsciiCase(family_name, "Lucida Console") ||
++      EqualIgnoringAsciiCase(family_name, "MS Mincho") ||
++      EqualIgnoringAsciiCase(family_name, "MS PMincho")) {
++    return font_family_names::kCourierNew;
++  }
++  // Serif Win fonts → Times New Roman (resolves to Tinos)
++  if (EqualIgnoringAsciiCase(family_name, "Cambria") ||
++      EqualIgnoringAsciiCase(family_name, "Cambria Math") ||
++      EqualIgnoringAsciiCase(family_name, "Constantia") ||
++      EqualIgnoringAsciiCase(family_name, "Georgia") ||
++      EqualIgnoringAsciiCase(family_name, "Palatino Linotype") ||
++      EqualIgnoringAsciiCase(family_name, "Century") ||
++      EqualIgnoringAsciiCase(family_name, "Lucida Bright") ||
++      EqualIgnoringAsciiCase(family_name, "Bookman Old Style") ||
++      EqualIgnoringAsciiCase(family_name, "Garamond") ||
++      EqualIgnoringAsciiCase(family_name, "Book Antiqua")) {
++    return font_family_names::kTimesNewRoman;
++  }
++  // Cursive/script Win fonts → Times New Roman as approximation
++  if (EqualIgnoringAsciiCase(family_name, "Monotype Corsiva") ||
++      EqualIgnoringAsciiCase(family_name, "Pristina") ||
++      EqualIgnoringAsciiCase(family_name, "Lucida Calligraphy") ||
++      EqualIgnoringAsciiCase(family_name, "Lucida Handwriting") ||
++      EqualIgnoringAsciiCase(family_name, "Edwardian Script ITC")) {
++    return font_family_names::kTimesNewRoman;
++  }
++#endif
++
+   return g_empty_atom;
+ }
+ 
+diff --git a/third_party/blink/renderer/platform/fonts/font_cache.cc b/third_party/blink/renderer/platform/fonts/font_cache.cc
+index 75cc0b764f8c4..9d97849b28b1b 100644
+--- a/third_party/blink/renderer/platform/fonts/font_cache.cc
++++ b/third_party/blink/renderer/platform/fonts/font_cache.cc
+@@ -43,6 +43,8 @@
+ #include "build/build_config.h"
+ #include "skia/ext/font_utils.h"
+ #include "third_party/blink/public/common/features.h"
++#include "third_party/blink/public/common/fingerprinting/fingerprint_profile.h"
++#include "third_party/blink/public/common/fingerprinting/font_allowlist.h"
+ #include "third_party/blink/public/platform/platform.h"
+ #include "third_party/blink/renderer/platform/font_family_names.h"
+ #include "third_party/blink/renderer/platform/fonts/alternate_font_family.h"
+@@ -141,6 +143,57 @@ const FontPlatformData* FontCache::GetFontPlatformData(
+   }
+ #endif
+ 
++  // Fingerprint isolation (FINGERPRINT_ISOLATION_PLAN.md task #9): only
++  // resolve allowlisted system family names so pages can't probe which
++  // fonts the host has installed via CSS family-fallback timing. Empty
++  // family is a "give me the default" request and is preserved. Generic
++  // sentinels (sans-serif, monospace, …) are resolved upstream by the CSS
++  // font fallback engine into concrete family names before reaching this
++  // function, so they aren't affected. Web @font-face / FontCustomPlatformData
++  // bypasses this path entirely.
++  //
++  // 2026-05-30: STRICT allowlist — only the canonical Win 10/11 base font
++  // set is visible to page-driven probes. A a fingerprinting test page run surfaced our Linux
++  // build's DejaVu / Liberation / Noto-* (incl. rare scripts like Yezidi,
++  // Gondi, Canadian Aboriginal) as the "38% like headless" tell: real Win 11
++  // users have NONE of these. The strict allowlist hides them at the
++  // FontPlatformData layer so probes via CSS measurement / FontFace local()
++  // get nullptr and conclude "font not installed". Internal Blink fallback
++  // (-webkit-standard etc.) goes through FontFallbackList::GetFontData →
++  // FontCache::GetFontData directly, bypassing this gate, so pages without
++  // an explicit font-family still render.
++  //
++  // 2026-05-31: the entire gate is Mac-excluded. The strict allowlist is
++  // calibrated for the Linux VPS deployment, where the Win-clone TTFs are
++  // installed at /usr/local/share/fonts/chromfish-win-clones/ so the persona-
++  // approved family names (Calibri, Franklin Gothic, etc.) resolve to disk
++  // files. On Mac dev builds those clones aren't installed, so the allowlist
++  // would reject every requested family AND every system fallback (Helvetica,
++  // SF Pro, Menlo) — Chrome's font matcher then returns nullptr to layout,
++  // NULL-derefs during glyph rendering, and crashes the renderer (SIGSEGV/
++  // SIGABRT, observed on a fingerprint test site, a fingerprinting test page, a fingerprint test site). Skip the gate
++  // entirely on Mac so pages render normally.
++#if !BUILDFLAG(IS_MAC)
++  if (creation_params.CreationType() == kCreateFontByFamily &&
++      !creation_params.Family().empty()) {
++    const std::string family_utf8 = creation_params.Family().Utf8();
++    if (!fingerprinting::IsAllowedFontFamilyStrict(family_utf8)) {
++      return nullptr;
++    }
++    // Note: an earlier revision substituted Mac-default font names
++    // (Helvetica/Menlo/Lucida Grande/Times) to Win-equivalents (Arial/
++    // Consolas/Times New Roman) at this layer when the persona claimed
++    // Windows. That broke canvas measureText behavior — real Win Chrome
++    // with `font-family: Helvetica` falls back to `-webkit-standard`
++    // (Times New Roman), NOT Arial, so substituting to Arial here
++    // produced widths that real Win Chrome would never produce. Better
++    // to leave these family names alone here and rely on
++    // FontFallbackList::GetFontData's aggressive skip
++    // (IsMacOnlyFontFamilyAggressive) which causes the CSS cascade to
++    // continue past the family — matching Win Chrome's natural fallback.
++  }
++#endif
++
+   return font_platform_data_cache_.GetOrCreateFontPlatformData(
+       this, font_description, creation_params, alternate_font_name);
+ }
+diff --git a/third_party/blink/renderer/platform/fonts/font_fallback_list.cc b/third_party/blink/renderer/platform/fonts/font_fallback_list.cc
+index c38cf414f9e09..cf38374cbc545 100644
+--- a/third_party/blink/renderer/platform/fonts/font_fallback_list.cc
++++ b/third_party/blink/renderer/platform/fonts/font_fallback_list.cc
+@@ -29,6 +29,7 @@
+ #include "third_party/blink/renderer/platform/fonts/font_fallback_list.h"
+ 
+ #include "base/timer/elapsed_timer.h"
++#include "third_party/blink/public/common/fingerprinting/font_allowlist.h"
+ #include "third_party/blink/renderer/platform/font_family_names.h"
+ #include "third_party/blink/renderer/platform/fonts/alternate_font_family.h"
+ #include "third_party/blink/renderer/platform/fonts/font_cache.h"
+@@ -154,6 +155,21 @@ const FontData* FontFallbackList::GetFontData(
+ 
+   for (; curr_family; curr_family = curr_family->Next()) {
+     family_index_++;
++    // Lightweight-fork: silently skip macOS-specific font family names
++    // when iterating the CSS font-family stack. This makes JS font probes
++    // (canvas measureText + document.fonts.check) report Helvetica Neue,
++    // Menlo, Monaco, Apple Color Emoji etc. as not-installed, contradicting
++    // the macOS host signal that the commercial fingerprinter's ML uses to flag the browser
++    // as anti-detect. Last-resort fallback (GetLastResortFallbackFont)
++    // bypasses this loop by calling FontCache::GetFontData() directly, so
++    // Blink's internal cascade still finds "Times" and "Lucida Grande"
++    // when nothing else matches — no SIGSEGV.
++    if (!curr_family->FamilyName().empty()) {
++      const std::string family_utf8 = curr_family->FamilyName().Utf8();
++      if (fingerprinting::IsMacOnlyFontFamilyAggressive(family_utf8)) {
++        continue;
++      }
++    }
+     if (!font_selector_) {
+       // Don't query system fonts for empty font family name.
+       if (!curr_family->FamilyName().empty()) {
+diff --git a/third_party/blink/renderer/platform/fonts/mac/font_cache_mac.mm b/third_party/blink/renderer/platform/fonts/mac/font_cache_mac.mm
+index ec06f7decbacf..5a5603f628178 100644
+--- a/third_party/blink/renderer/platform/fonts/mac/font_cache_mac.mm
++++ b/third_party/blink/renderer/platform/fonts/mac/font_cache_mac.mm
+@@ -132,7 +132,11 @@ ScopedCFTypeRef<CTFontRef> GetSubstituteFont(CTFontRef ct_font,
+     // `chrome/app/resources/locale_settings_mac.grd` as the font to substitute
+     // from in `CTFontCreateForString`.
+     ScopedCFTypeRef<CTFontRef> font_to_substitute(
+-        CTFontCreateWithName(CFSTR("Times"), size, nullptr));
++        // Lightweight-fork: use "Times New Roman" (Win-typical) instead of
++        // the macOS-typical "Times" so the fingerprinter's emoji.font probe doesn't leak
++        // that we're on macOS. CoreText will resolve to the system Times
++        // family either way; only the reported family name differs.
++        CTFontCreateWithName(CFSTR("Times New Roman"), size, nullptr));
+     substitute_font.reset(
+         CTFontCreateForString(font_to_substitute.get(), string.get(), range));
+   } else {
 diff --git a/third_party/blink/renderer/platform/runtime_enabled_features.json5 b/third_party/blink/renderer/platform/runtime_enabled_features.json5
 index 368d39278163d..a6882cd5f1719 100644
 --- a/third_party/blink/renderer/platform/runtime_enabled_features.json5

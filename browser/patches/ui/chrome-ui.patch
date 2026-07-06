@@ -676,9 +676,9 @@ index 76fa678e056b4..9d9a50254b896 100644
  #include "chrome/browser/contextual_tasks/contextual_tasks_ui.h"
 +#include "chrome/browser/ui/webui/metachat/metachat_ui.h"
  #include "chrome/browser/glic/host/glic_ui.h"
-@@ -492,4 +493,5 @@ void RegisterChromeWebUIConfigs() {
-   map.AddWebUIConfig(std::make_unique<skills::SkillsUIConfig>());
-+  map.AddWebUIConfig(std::make_unique<MetaChatUIConfig>());
+@@ -493,3 +493,5 @@ void RegisterChromeWebUIConfigs() {
  #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
-        // BUILDFLAG(IS_CHROMEOS)
+         // BUILDFLAG(IS_CHROMEOS)
++  // MetaChat: chrome://metachat/ - account management, plugin launcher
++  map.AddWebUIConfig(std::make_unique<MetaChatUIConfig>());
  }
