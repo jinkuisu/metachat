@@ -19,6 +19,15 @@ jobs:
     timeout-minutes: 480
 
     steps:
+      - name: Restore Chromium cache
+        id: cache-chromium
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.CHROMIUM_DIR }}
+          key: chromium-${{ env.CHROMIUM_COMMIT }}
+          restore-keys: |
+            chromium-150.0.
+            chromium-
       - uses: actions/checkout@v4
         with:
           path: metachat
@@ -36,6 +45,7 @@ jobs:
           choco install windows-sdk-10.0 -y
 
       - name: Fetch Chromium source
+        if: steps.cache-chromium.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path $env:CHROMIUM_DIR
@@ -46,6 +56,12 @@ jobs:
           git fetch origin tag $env:CHROMIUM_COMMIT --depth=1
           git checkout $env:CHROMIUM_COMMIT
           gclient sync --with_branch_heads --with_tags --nohooks -D
+      - name: Save Chromium cache
+        if: steps.cache-chromium.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.CHROMIUM_DIR }}
+          key: chromium-${{ env.CHROMIUM_COMMIT }}
 
 
       - name: Download ChromiumFish font files (21 lean fonts)
