@@ -8,7 +8,7 @@
 #
 # 修改文件：
 #   1. chrome/app/app-Info.plist
-#      - CFBundleDisplayName:  -> 
+#      - CFBundleDisplayName:  ->
 #      - 使 macOS 上的显示名跟随 PRODUCT_SHORT_NAME 变量
 #
 #   2. chrome/app/chromium_strings.grd

@@ -27,19 +27,19 @@ index ae5df201946d0..7a58dbc28acb3 100644
 --- a/chrome/browser/app_controller_mac.mm
 +++ b/chrome/browser/app_controller_mac.mm
 @@ -911,6 +911,9 @@ - (void)mainMenuCreated {
- 
+
    // Initialize the Profile menu.
    [self initProfileMenu];
 +
 +  // Lightweight-fork: drop top-level History/Bookmarks/Help menus.
 +  [self lightweightForkPruneMenuBar];
  }
- 
+
  - (void)unregisterEventHandlers {
 @@ -1901,6 +1904,17 @@ - (void)initProfileMenu {
    NSMenu* mainMenu = [NSApp mainMenu];
    NSMenuItem* profileMenu = [mainMenu itemWithTag:IDC_PROFILE_MAIN_MENU];
- 
+
 +  // Lightweight-fork (FINGERPRINT_ISOLATION_PLAN.md task #7 / Phase 6b):
 +  // unconditionally remove the Profile menu. No multi-profile UI in this
 +  // fork; IsLightweightForkBlockedCommand already blocks every profile
@@ -55,7 +55,7 @@ index ae5df201946d0..7a58dbc28acb3 100644
      [mainMenu removeItem:profileMenu];
      return;
 @@ -1911,6 +1925,39 @@ - (void)initProfileMenu {
- 
+
    _profileMenuController =
        [[ProfileMenuController alloc] initWithMainMenuItem:profileMenu];
 +  */
@@ -92,7 +92,7 @@ index ae5df201946d0..7a58dbc28acb3 100644
 +    }
 +  }
  }
- 
+
  - (void)initShareMenu {
 diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
 index ed69c678e9a8d..d206338d33205 100644
@@ -100,13 +100,13 @@ index ed69c678e9a8d..d206338d33205 100644
 +++ b/chrome/browser/ui/browser_command_controller.cc
 @@ -5,3 +1,4 @@
  #include "chrome/browser/ui/browser_command_controller.h"
- 
+
 +#include "base/logging.h"
  #include <stddef.h>
 @@ -221,6 +221,109 @@ void AppInfoDialogClosedCallback(SessionID session_id,
    }
  }
- 
+
 +bool IsLightweightForkBlockedCommand(int id) {
 +  switch (id) {
 +    // Host/file integration.
@@ -215,21 +215,21 @@ index ed69c678e9a8d..d206338d33205 100644
        browser->is_type_app_popup()) {
 @@ -582,15 +685,26 @@ void BrowserCommandController::ShowCustomizeChromeSidePanel(
  // BrowserCommandController, CommandUpdater implementation:
- 
+
  bool BrowserCommandController::SupportsCommand(int id) const {
 +  if (IsLightweightForkBlockedCommand(id)) {
 +    return false;
 +  }
    return command_updater_.SupportsCommand(id);
  }
- 
+
  bool BrowserCommandController::IsCommandEnabled(int id) const {
 +  if (IsLightweightForkBlockedCommand(id)) {
 +    return false;
 +  }
    return command_updater_.IsCommandEnabled(id);
  }
- 
+
  bool BrowserCommandController::ExecuteCommand(int id,
                                                base::TimeTicks time_stamp) {
 +  if (IsLightweightForkBlockedCommand(id)) {
@@ -272,7 +272,7 @@ index 26feac287c1f6..e3d8dbfa60403 100644
    page_action_controller->Hide(kActionSidePanelShowReadAnything);
 +#endif  // 0 — end lightweight-fork dead-code wrap
  }
- 
+
  // static
 diff --git a/chrome/browser/ui/startup/bad_flags_prompt.cc b/chrome/browser/ui/startup/bad_flags_prompt.cc
 index 0deb93f45504c..47fc835cc2dde 100644
@@ -281,7 +281,7 @@ index 0deb93f45504c..47fc835cc2dde 100644
 @@ -121,10 +121,15 @@ const char* const kBadFlags[] = {
      switches::kEnableSpeechDispatcher,
  #endif
- 
+
 -    // These flags control Blink feature state, which is not supported and is
 -    // intended only for use by Chromium developers.
 -    switches::kDisableBlinkFeatures,
@@ -295,12 +295,12 @@ index 0deb93f45504c..47fc835cc2dde 100644
 +    // still warns as intended.
 +    // switches::kDisableBlinkFeatures,
 +    // switches::kEnableBlinkFeatures,
- 
+
      // This flag allows people to allowlist certain origins as secure, even
      // if they are not.
 @@ -252,6 +257,12 @@ void ShowBadFlagsInfoBarHelper(content::WebContents* web_contents,
  }  // namespace
- 
+
  void ShowBadFlagsPrompt(content::WebContents* web_contents) {
 +  // Lightweight-fork: suppress ALL "unsupported command-line flag" warning
 +  // infobars. The fork deliberately launches with --enable-unsafe-webgpu (so
@@ -328,13 +328,13 @@ index 4907b9a951040..27d7e2ae0f986 100644
  #include "components/prefs/pref_service.h"
  #include "content/public/common/content_switches.h"
 -#include "google_apis/google_api_keys.h"
- 
+
  #if !BUILDFLAG(IS_CHROMEOS) && !BUILDFLAG(IS_ANDROID)
  #include "chrome/browser/ui/startup/default_browser_prompt/default_browser_prompt.h"
 @@ -145,9 +143,13 @@ void AddInfoBarsIfNecessary(BrowserWindowInterface* browser,
      return;
    }
- 
+
 -  // Web apps should not display the session restore bubble (crbug.com/40800614)
 -  const bool should_display_bubble =
 -      !is_web_app && HasPendingUncleanExit(browser->GetProfile());
@@ -351,7 +351,7 @@ index 4907b9a951040..27d7e2ae0f986 100644
 @@ -185,9 +187,11 @@ void AddInfoBarsIfNecessary(BrowserWindowInterface* browser,
    infobars::ContentInfoBarManager* infobar_manager =
        infobars::ContentInfoBarManager::FromWebContents(web_contents);
- 
+
 -  if (!google_apis::HasAPIKeyConfigured()) {
 -    GoogleApiKeysInfoBarDelegate::Create(infobar_manager);
 -  }
@@ -360,7 +360,7 @@ index 4907b9a951040..27d7e2ae0f986 100644
 +  // if (!google_apis::HasAPIKeyConfigured()) {
 +  //   GoogleApiKeysInfoBarDelegate::Create(infobar_manager);
 +  // }
- 
+
    if (ObsoleteSystem::IsObsoleteNowOrSoon()) {
      PrefService* local_state = g_browser_process->local_state();
 diff --git a/chrome/browser/ui/toolbar/app_menu_model.cc b/chrome/browser/ui/toolbar/app_menu_model.cc
@@ -368,7 +368,7 @@ index 196c09329841a..01fe742f0037c 100644
 --- a/chrome/browser/ui/toolbar/app_menu_model.cc
 +++ b/chrome/browser/ui/toolbar/app_menu_model.cc
 @@ -240,7 +240,7 @@ void AddSubMenuWithStringIdAndVectorIcon(ui::SimpleMenuModel* model,
- 
+
  // Conditionally return the update app menu item title based on upgrade detector
  // state.
 -std::u16string GetUpgradeDialogTitleText() {
@@ -379,7 +379,7 @@ index 196c09329841a..01fe742f0037c 100644
 @@ -894,7 +894,7 @@ SaveAndShareSubMenuModel::SaveAndShareSubMenuModel(
    }
  }
- 
+
 -bool ArePromotionsEnabled() {
 +[[maybe_unused]] bool ArePromotionsEnabled() {
    PrefService* local_state = g_browser_process->local_state();
@@ -397,7 +397,7 @@ index 196c09329841a..01fe742f0037c 100644
    DCHECK_EQ(0u, GetItemCount());
 +  uma_action_recorded_ = false;
 +  return;  // Skip the original (huge) Build body below.
- 
+
 -  if (app_menu_icon_controller_ &&
 -      app_menu_icon_controller_->GetTypeAndSeverity().type ==
 -          AppMenuIconController::IconType::kUpgradeNotification) {
@@ -413,16 +413,16 @@ index 196c09329841a..01fe742f0037c 100644
 -  }
 +  // ====== Original full body retained below but unreachable. ======
 +#if 0  // Lightweight-fork: original body kept for diff reference only.
- 
+
    if (AddSafetyHubMenuItem() || AddGlobalErrorMenuItems() ||
        AddDefaultBrowserMenuItems()) {
 @@ -2191,6 +2185,7 @@ void AppMenuModel::Build() {
  #endif  // !BUILDFLAG(IS_CHROMEOS)
- 
+
    uma_action_recorded_ = false;
 +#endif  // 0 — end of lightweight-fork unreachable original Build() body
  }
- 
+
  void AppMenuModel::CreateCutCopyPasteMenu() {
 diff --git a/chrome/browser/ui/views/bookmarks/bookmark_page_action_controller.cc b/chrome/browser/ui/views/bookmarks/bookmark_page_action_controller.cc
 index 1388bf93a47c4..c2e4ba2a2f11c 100644
@@ -431,7 +431,7 @@ index 1388bf93a47c4..c2e4ba2a2f11c 100644
 @@ -28,15 +28,6 @@
  #include "ui/base/l10n/l10n_util.h"
  #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
- 
+
 -namespace {
 -
 -bool IsNTPUrl(const GURL& url) {
@@ -442,11 +442,11 @@ index 1388bf93a47c4..c2e4ba2a2f11c 100644
 -}  // namespace
 -
  DEFINE_USER_DATA(BookmarkPageActionController);
- 
+
  BookmarkPageActionController::BookmarkPageActionController(
 @@ -127,9 +118,8 @@ void BookmarkPageActionController::UpdatePageActionVisibility() {
  }
- 
+
  bool BookmarkPageActionController::ShouldShowPageAction() const {
 -  const auto& url = tab().GetContents()->GetLastCommittedURL();
 -  return browser_defaults::bookmarks_enabled &&
@@ -454,7 +454,7 @@ index 1388bf93a47c4..c2e4ba2a2f11c 100644
 +  // Lightweight-fork: utility browser — bookmark star never shown.
 +  return false;
  }
- 
+
  void BookmarkPageActionController::SetStarred(bool starred) {
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
 index 787771d2e8fcb..b8c6954de99b4 100644
@@ -462,7 +462,7 @@ index 787771d2e8fcb..b8c6954de99b4 100644
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -5125,6 +5125,9 @@ ContentsLayoutManager* BrowserView::GetContentsLayoutManager() const {
  }
- 
+
  bool BrowserView::MaybeShowBookmarkBar(WebContents* contents) {
 +  // Lightweight-fork: utility browser — never show the bookmarks bar.
 +  return false;
@@ -472,11 +472,11 @@ index 787771d2e8fcb..b8c6954de99b4 100644
                        Browser::WindowFeature::kFeatureBookmarkBar);
 @@ -5168,6 +5171,7 @@ bool BrowserView::MaybeShowBookmarkBar(WebContents* contents) {
    }
- 
+
    return needs_layout;
 +#endif  // 0 — end lightweight-fork dead-code wrap
  }
- 
+
  bool BrowserView::MaybeShowInfoBar(WebContents* contents) {
 diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.cc b/chrome/browser/ui/views/location_bar/location_bar_view.cc
 index ef701ccfec136..6d9f62c6f3ce0 100644
@@ -490,13 +490,13 @@ index ef701ccfec136..6d9f62c6f3ce0 100644
 +  // (popover with Connection/Cookies/Site settings). Keep the view to satisfy
 +  // internal pointer references; just make it invisible.
 +  location_icon_view_->SetVisible(false);
- 
+
    if (page_info::IsMerchantTrustFeatureEnabled() &&
        page_info::kMerchantTrustEnableOmniboxChip.Get()) {
 @@ -568,9 +572,10 @@ void LocationBarView::Init() {
                                  PageActionIconType::kAiMode);
    }
- 
+
 -  if (browser_ && !is_popup_mode_) {
 -    params.types_enabled.push_back(PageActionIconType::kBookmarkStar);
 -  }
@@ -504,7 +504,7 @@ index ef701ccfec136..6d9f62c6f3ce0 100644
 +  // if (browser_ && !is_popup_mode_) {
 +  //   params.types_enabled.push_back(PageActionIconType::kBookmarkStar);
 +  // }
- 
+
    params.icon_color = color_provider->GetColor(kColorOmniboxActionIcon);
    params.between_icon_spacing = kBetweenIconSpacing;
 @@ -962,18 +967,9 @@ void LocationBarView::Layout(PassKey) {
@@ -527,7 +527,7 @@ index ef701ccfec136..6d9f62c6f3ce0 100644
 +    // location icon (the lock / tune / chip on the left of the omnibox).
      location_icon_view_->SetVisible(false);
    }
- 
+
 diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
 index a45396e6e3db3..95dc7b5c98613 100644
 --- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
@@ -555,7 +555,7 @@ index a45396e6e3db3..95dc7b5c98613 100644
 +    // Lightweight-fork: utility browser — no profile/identity UI ever.
 +    avatar_->SetVisible(false);
    }
- 
+
    overflow_button_ = AddChildView(std::make_unique<OverflowButton>());
 @@ -608,6 +594,10 @@ void ToolbarView::Init() {
        l10n_util::GetStringUTF16(IDS_APPMENU_TOOLTIP));
@@ -565,7 +565,7 @@ index a45396e6e3db3..95dc7b5c98613 100644
 +  // alive (lots of code references it for focus / accessibility), just make
 +  // it invisible.
 +  app_menu_button_->SetVisible(false);
- 
+
    if (base::FeatureList::IsEnabled(contextual_tasks::kContextualTasks) &&
        contextual_tasks::GetExpandButtonOption() ==
 diff --git a/chrome/browser/ui/webui/chrome_web_ui_configs.cc b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
@@ -652,21 +652,21 @@ index 76fa678e056b4..9d9a50254b896 100644
 +  // map.AddWebUIConfig(std::make_unique<ManagementUIConfig>());
  #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||
          // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_DESKTOP_ANDROID)
- 
+
 diff --git a/chrome/common/webui_url_constants.cc b/chrome/common/webui_url_constants.cc
 index dd37ab85cec11..4ff23f0e8ab8c 100644
 --- a/chrome/common/webui_url_constants.cc
 +++ b/chrome/common/webui_url_constants.cc
 @@ -336,7 +336,8 @@ const GURL& ChromeUINewTabPageURLAsGURL() {
  }
- 
+
  const GURL& ChromeUINewTabURLAsGURL() {
 -  static base::NoDestructor<GURL> instance(kChromeUINewTabURL);
 +  // Lightweight-fork: blank NTP instead of the Google-branded chrome://newtab.
 +  static base::NoDestructor<GURL> instance("about:blank");
    return *instance;
  }
- 
+
 
 diff --git a/chrome/browser/ui/webui/chrome_web_ui_configs.cc b/chrome/browser/ui/webui/chrome_web_ui_configs.cc
 index 76fa678e056b4..9d9a50254b896 100644

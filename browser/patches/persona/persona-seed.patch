@@ -80,7 +80,7 @@ index a5dd79908643a..7a454d86f251c 100644
 @@ -934,6 +934,10 @@ const char kEnableAggressiveDOMStorageFlushing[] =
  // Enable indication that browser is controlled by automation.
  const char kEnableAutomation[] = "enable-automation";
- 
+
 +// MetaChat: 指纹种子开关 - 64 位无符号整数（十进制格式）
 +// 每个浏览器会话由此种子值确定唯一的指纹面具
 +const char kPersonaSeed[] = "persona-seed";

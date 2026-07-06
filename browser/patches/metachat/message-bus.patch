@@ -364,7 +364,7 @@ diff --git a/chrome/common/webui_url_constants.cc b/chrome/common/webui_url_cons
 --- a/chrome/common/webui_url_constants.cc
 +++ b/chrome/common/webui_url_constants.cc
 @@ -119,6 +119,8 @@ bool IsSystemWebUIHost(std::string_view host) {
- 
+
  // Add hosts here to be included in chrome://chrome-urls (about:about).
  // These hosts will also be suggested by BuiltinProvider.
 +// MetaChat Browser

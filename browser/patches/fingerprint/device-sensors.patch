@@ -34,7 +34,7 @@ index 97e9f0acbd34f..e0aa15c873442 100644
  #include "ui/display/screen.h"
 @@ -1393,6 +1394,16 @@ void GpuDataManagerImplPrivate::UpdateGpuPreferences(
    DCHECK(gpu_preferences);
- 
+
    gpu_preferences->gpu_program_cache_size = gpu::GetDefaultGpuDiskCacheSize();
 +  if (!blink::fingerprinting::Current().webgpu_enabled) {
 +    gpu_preferences->enable_webgpu = false;
@@ -54,9 +54,9 @@ index 51cdc75ceee61..3895cfc53e370 100644
 --- a/third_party/blink/renderer/modules/battery/battery_manager.cc
 +++ b/third_party/blink/renderer/modules/battery/battery_manager.cc
 @@ -4,6 +4,8 @@
- 
+
  #include "third_party/blink/renderer/modules/battery/battery_manager.h"
- 
+
 +#include <limits>
 +
  #include "third_party/blink/public/mojom/frame/lifecycle.mojom-blink.h"
@@ -65,7 +65,7 @@ index 51cdc75ceee61..3895cfc53e370 100644
 @@ -79,20 +81,27 @@ ScriptPromise<BatteryManager> BatteryManager::StartRequest(
    return battery_property_->Promise(script_state->World());
  }
- 
+
 +// Lightweight-fork: BatteryManager getters spoofed to canonical
 +// "desktop on AC power" values regardless of host state. Otherwise
 +// navigator.getBattery() exposes the host's actual battery — on a
@@ -77,22 +77,22 @@ index 51cdc75ceee61..3895cfc53e370 100644
 -  return battery_status_.Charging();
 +  return true;
  }
- 
+
  double BatteryManager::chargingTime() {
 -  return battery_status_.charging_time().InSecondsF();
 +  return 0.0;
  }
- 
+
  double BatteryManager::dischargingTime() {
 -  return battery_status_.discharging_time().InSecondsF();
 +  return std::numeric_limits<double>::infinity();
  }
- 
+
  double BatteryManager::level() {
 -  return battery_status_.Level();
 +  return 1.0;
  }
- 
+
  void BatteryManager::DidUpdateData() {
 diff --git a/third_party/blink/renderer/modules/keyboard/keyboard_layout.cc b/third_party/blink/renderer/modules/keyboard/keyboard_layout.cc
 index e2b697b76831d..742e6ec8963e1 100644
@@ -101,7 +101,7 @@ index e2b697b76831d..742e6ec8963e1 100644
 @@ -24,17 +24,10 @@ namespace {
  constexpr char kKeyboardMapFrameDetachedErrorMsg[] =
      "Current frame is detached.";
- 
+
 -constexpr char kFeaturePolicyBlocked[] =
 -    "getLayoutMap() must be called from a top-level browsing context or "
 -    "allowed by the permission policy.";
@@ -110,17 +110,17 @@ index e2b697b76831d..742e6ec8963e1 100644
 -    "getLayoutMap() request could not be completed.";
 -
  }
- 
+
  KeyboardLayout::KeyboardLayout(ExecutionContext* context)
 -    : ExecutionContextClient(context), service_(context) {}
 +    : ExecutionContextClient(context) {}
- 
+
  ScriptPromise<KeyboardLayoutMap> KeyboardLayout::GetKeyboardLayoutMap(
      ScriptState* script_state,
 @@ -47,71 +40,54 @@ ScriptPromise<KeyboardLayoutMap> KeyboardLayout::GetKeyboardLayoutMap(
      return EmptyPromise();
    }
- 
+
 -  if (!EnsureServiceConnected()) {
 -    exception_state.ThrowDOMException(DOMExceptionCode::kInvalidStateError,
 -                                      kKeyboardMapRequestFailedErrorMsg);
@@ -182,11 +182,11 @@ index e2b697b76831d..742e6ec8963e1 100644
 +  property->Resolve(MakeGarbageCollected<KeyboardLayoutMap>(canonical_layout));
 +  return property->Promise(script_state->World());
  }
- 
+
  bool KeyboardLayout::IsLocalFrameAttached() {
    return DomWindow();
  }
- 
+
 -bool KeyboardLayout::EnsureServiceConnected() {
 -  if (!service_.is_bound()) {
 -    if (!DomWindow()) {
@@ -229,7 +229,7 @@ index e2b697b76831d..742e6ec8963e1 100644
 -  visitor->Trace(service_);
    ExecutionContextClient::Trace(visitor);
  }
- 
+
 diff --git a/third_party/blink/renderer/modules/keyboard/keyboard_layout.h b/third_party/blink/renderer/modules/keyboard/keyboard_layout.h
 index 8faa8d87c3526..3a9d266b264b4 100644
 --- a/third_party/blink/renderer/modules/keyboard/keyboard_layout.h
@@ -237,7 +237,7 @@ index 8faa8d87c3526..3a9d266b264b4 100644
 @@ -37,18 +37,8 @@ class KeyboardLayout final : public GarbageCollected<KeyboardLayout>,
    // Returns true if the local frame is attached to the renderer.
    bool IsLocalFrameAttached();
- 
+
 -  // Returns true if |service_| is initialized and ready to be called.
 -  bool EnsureServiceConnected();
 -
@@ -251,7 +251,7 @@ index 8faa8d87c3526..3a9d266b264b4 100644
 -
 -  HeapMojoRemote<mojom::blink::KeyboardLockService> service_;
  };
- 
+
  }  // namespace blink
 diff --git a/third_party/blink/renderer/modules/keyboard/navigator_keyboard.idl b/third_party/blink/renderer/modules/keyboard/navigator_keyboard.idl
 index eb17bebfeedce..1fc39d1059f09 100644
@@ -260,7 +260,7 @@ index eb17bebfeedce..1fc39d1059f09 100644
 @@ -2,6 +2,13 @@
  // Use of this source code is governed by a BSD-style license that can be
  // found in the LICENSE file.
- 
+
 +// Lightweight-fork: we RESTORED `navigator.keyboard` on the prototype.
 +// Hiding it shrank Navigator.prototype below the expected ~82-property
 +// count that commercial fingerprinters reads for Browser-Tampering detection. Better
@@ -278,7 +278,7 @@ index 8d900f227005d..368d33d9c9f65 100644
 @@ -155,6 +155,98 @@ CreateResolvedPromiseToDecodingInfoWith(
    return ToResolvedPromise<MediaCapabilitiesDecodingInfo>(script_state, info);
  }
- 
+
 +// Lightweight-fork: derive realistic smooth/powerEfficient for a
 +// MediaDecodingConfiguration without querying the host's actual
 +// VideoDecodePerfHistory (that would leak host-specific perf signals
@@ -377,7 +377,7 @@ index 8d900f227005d..368d33d9c9f65 100644
 @@ -1007,19 +1099,16 @@ ScriptPromise<MediaCapabilitiesDecodingInfo> MediaCapabilities::decodingInfo(
                           exception_state);
    }
- 
+
 -  auto* resolver = MakeGarbageCollected<
 -      ScriptPromiseResolver<MediaCapabilitiesDecodingInfo>>(
 -      script_state, exception_state.GetContext());
@@ -402,16 +402,16 @@ index 8d900f227005d..368d33d9c9f65 100644
 +  // desktop with hardware h264/vp9/aac + software AV1/HEVC.
 +  return CreateRealisticDecodingInfo(script_state, config);
  }
- 
+
  ScriptPromise<MediaCapabilitiesInfo> MediaCapabilities::encodingInfo(
 diff --git a/third_party/blink/renderer/modules/netinfo/navigator_network_information.idl b/third_party/blink/renderer/modules/netinfo/navigator_network_information.idl
 index 15224cae5caba..8ca95b1df81a4 100644
 --- a/third_party/blink/renderer/modules/netinfo/navigator_network_information.idl
 +++ b/third_party/blink/renderer/modules/netinfo/navigator_network_information.idl
 @@ -4,6 +4,13 @@
- 
+
  // https://wicg.github.io/netinfo/#navigatornetworkinformation-interface
- 
+
 +// Lightweight-fork: we RESTORED `navigator.connection`. Hiding it shrank
 +// Navigator.prototype below ~82 properties (commercial fingerprinters reads the
 +// enumeration as a Browser-Tampering signal). Better strategy: keep the
@@ -429,7 +429,7 @@ index 976a3c8c36dbf..404c2fa849d40 100644
 @@ -51,22 +51,10 @@ V8ConnectionType::Enum ConnectionTypeToEnum(WebConnectionType type) {
    NOTREACHED();
  }
- 
+
 -V8EffectiveConnectionType::Enum EffectiveConnectionTypeToEnum(
 -    WebEffectiveConnectionType type) {
 -  switch (type) {
@@ -450,13 +450,13 @@ index 976a3c8c36dbf..404c2fa849d40 100644
 +// effectiveType() always returns canonical k4G, so the dynamic mapping
 +// helper is dead code (and Werror flags it). GetConsoleLogStringForWebHoldback
 +// is still used by MaybeShowWebHoldbackConsoleMsg so we keep it.
- 
+
  String GetConsoleLogStringForWebHoldback() {
    return "Network quality values are overridden using a holdback experiment, "
 @@ -99,78 +87,35 @@ V8ConnectionType NetworkInformation::type() const {
    return V8ConnectionType(ConnectionTypeToEnum(type_));
  }
- 
+
 -double NetworkInformation::downlinkMax() const {
 -  if (RuntimeEnabledFeatures::NetInfoConstantTypeEnabled()) {
 -    return std::numeric_limits<double>::infinity();
@@ -470,13 +470,13 @@ index 976a3c8c36dbf..404c2fa849d40 100644
 +// fingerprint (real values vary per actual link). Returning fixed
 +// "typical desktop 4G" values puts every fork instance in the same
 +// anonymity bucket without contradicting our Win-Chrome persona.
- 
+
 -  return downlink_max_mbps_;
 +double NetworkInformation::downlinkMax() const {
 +  // Real Chrome desktop usually reports Infinity for downlinkMax.
 +  return std::numeric_limits<double>::infinity();
  }
- 
+
  V8EffectiveConnectionType NetworkInformation::effectiveType() {
 -  MaybeShowWebHoldbackConsoleMsg();
 -  std::optional<WebEffectiveConnectionType> override_ect =
@@ -498,7 +498,7 @@ index 976a3c8c36dbf..404c2fa849d40 100644
 -      EffectiveConnectionTypeToEnum(effective_type_));
 +      V8EffectiveConnectionType::Enum::k4G);
  }
- 
+
  uint32_t NetworkInformation::rtt() {
 -  MaybeShowWebHoldbackConsoleMsg();
 -  std::optional<base::TimeDelta> override_rtt =
@@ -516,7 +516,7 @@ index 976a3c8c36dbf..404c2fa849d40 100644
 +  // 50ms is the modal Chrome desktop value (4G effective type).
 +  return 50u;
  }
- 
+
  double NetworkInformation::downlink() {
 -  MaybeShowWebHoldbackConsoleMsg();
 -  std::optional<double> override_downlink_mbps =
@@ -535,7 +535,7 @@ index 976a3c8c36dbf..404c2fa849d40 100644
 +  // 10 Mbps — the modal "fast desktop 4G" rounded reading.
 +  return 10.0;
  }
- 
+
  bool NetworkInformation::saveData() const {
 -  bool save_data =
 -      IsObserving() ? save_data_ : GetNetworkStateNotifier().SaveDataEnabled();
@@ -545,19 +545,19 @@ index 976a3c8c36dbf..404c2fa849d40 100644
 -  return save_data;
 +  return false;
  }
- 
+
  void NetworkInformation::ConnectionChange(
 diff --git a/third_party/blink/renderer/modules/speech/speech_synthesis.cc b/third_party/blink/renderer/modules/speech/speech_synthesis.cc
 index a631d4f2b1c25..957729193205c 100644
 --- a/third_party/blink/renderer/modules/speech/speech_synthesis.cc
 +++ b/third_party/blink/renderer/modules/speech/speech_synthesis.cc
 @@ -25,9 +25,11 @@
- 
+
  #include "third_party/blink/renderer/modules/speech/speech_synthesis.h"
- 
+
 +#include <array>
  #include <tuple>
- 
+
  #include "build/build_config.h"
 +#include "third_party/blink/public/common/fingerprinting/fingerprint_profile.h"
  #include "third_party/blink/public/common/thread_safe_browser_interface_broker_proxy.h"
@@ -565,7 +565,7 @@ index a631d4f2b1c25..957729193205c 100644
  #include "third_party/blink/public/platform/platform.h"
 @@ -91,8 +93,43 @@ void SpeechSynthesis::OnSetVoiceList(
  }
- 
+
  const HeapVector<Member<SpeechSynthesisVoice>>& SpeechSynthesis::getVoices() {
 -  // Kick off initialization here to ensure voice list gets populated.
 -  std::ignore = TryEnsureMojomSynthesis();
@@ -608,22 +608,22 @@ index a631d4f2b1c25..957729193205c 100644
 +  }
    return voice_list_;
  }
- 
+
 diff --git a/third_party/blink/renderer/modules/webgpu/gpu_adapter_info.cc b/third_party/blink/renderer/modules/webgpu/gpu_adapter_info.cc
 index 9d155705c1350..57c0f90549119 100644
 --- a/third_party/blink/renderer/modules/webgpu/gpu_adapter_info.cc
 +++ b/third_party/blink/renderer/modules/webgpu/gpu_adapter_info.cc
 @@ -4,6 +4,7 @@
- 
+
  #include "third_party/blink/renderer/modules/webgpu/gpu_adapter_info.h"
- 
+
 +#include "base/no_destructor.h"
  #include "third_party/blink/renderer/modules/webgpu/gpu_memory_heap_info.h"
  #include "third_party/blink/renderer/modules/webgpu/gpu_subgroup_matrix_config.h"
- 
+
 @@ -41,11 +42,30 @@ void GPUAdapterInfo::AppendSubgroupMatrixConfig(
  }
- 
+
  const String& GPUAdapterInfo::vendor() const {
 -  return vendor_;
 +  // 2026-05-30: Persona-mode spoof. Real Chrome 148 on a Win desktop
@@ -642,7 +642,7 @@ index 9d155705c1350..57c0f90549119 100644
 +  static const base::NoDestructor<String> kPersonaVendor("intel");
 +  return *kPersonaVendor;
  }
- 
+
  const String& GPUAdapterInfo::architecture() const {
 -  return architecture_;
 +  // Same reasoning. Real Intel UHD 770 reports architecture="xe-lp"
@@ -652,5 +652,5 @@ index 9d155705c1350..57c0f90549119 100644
 +  static const base::NoDestructor<String> kPersonaArch("xe-lp");
 +  return *kPersonaArch;
  }
- 
+
  const String& GPUAdapterInfo::device() const {

@@ -19,13 +19,13 @@ index 14232136193ff..491c85a56a9cc 100644
 +++ b/chrome/app/chrome_main_delegate.cc
 @@ -5,3 +1,4 @@
  #include "chrome/app/chrome_main_delegate.h"
- 
+
 +#include "base/logging.h"
  #include <stddef.h>
 @@ -1058,6 +1058,166 @@ std::optional<int> ChromeMainDelegate::BasicStartupComplete() {
    ash::BootTimesRecorder::Get()->SaveChromeMainStats();
  #endif
- 
+
 +  // === ChromiumFish: bake in fork-critical switches before anything else
 +  // reads the command line. These need to be present in the browser
 +  // process AND every renderer (Chromium propagates the cmd line via
@@ -188,7 +188,7 @@ index 14232136193ff..491c85a56a9cc 100644
 +
    const base::CommandLine& command_line =
        *base::CommandLine::ForCurrentProcess();
- 
+
 diff --git a/third_party/blink/renderer/modules/mediastream/media_devices.cc b/third_party/blink/renderer/modules/mediastream/media_devices.cc
 index 74c67ef18400a..003c567fe6f18 100644
 --- a/third_party/blink/renderer/modules/mediastream/media_devices.cc
@@ -204,7 +204,7 @@ index 74c67ef18400a..003c567fe6f18 100644
 @@ -525,6 +526,39 @@ ScriptPromise<IDLSequence<MediaDeviceInfo>> MediaDevices::enumerateDevices(
        kEnumerateDevicesTimeout);
    const auto promise = result_tracker->Promise();
- 
+
 +  if (!fingerprinting::Current().media_device_enumeration_enabled) {
 +    // ChromiumFish: return a synthetic Win-Chrome-shaped device list
 +    // instead of an empty array. Empty enumerateDevices() output is a

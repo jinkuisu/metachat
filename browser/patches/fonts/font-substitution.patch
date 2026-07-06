@@ -318,7 +318,7 @@ index ab909958f63e2..33910187b0cbb 100644
 @@ -101,6 +101,91 @@ inline const AtomicString& AlternateFamilyName(
      return font_family_names::kArial;
    }
- 
+
 +#if BUILDFLAG(IS_MAC)
 +  // Lightweight-fork: route Win-typical font-family names to the libre
 +  // equivalents installed via tools/activate_lean_fonts.py. Without this,
@@ -406,7 +406,7 @@ index ab909958f63e2..33910187b0cbb 100644
 +
    return g_empty_atom;
  }
- 
+
 diff --git a/third_party/blink/renderer/platform/fonts/font_cache.cc b/third_party/blink/renderer/platform/fonts/font_cache.cc
 index 75cc0b764f8c4..00ad27fcc43e0 100644
 --- a/third_party/blink/renderer/platform/fonts/font_cache.cc
@@ -423,7 +423,7 @@ index 75cc0b764f8c4..00ad27fcc43e0 100644
 @@ -135,6 +137,57 @@ const FontPlatformData* FontCache::GetFontPlatformData(
    }
  #endif
- 
+
 +  // Fingerprint isolation (FINGERPRINT_ISOLATION_PLAN.md task #9): only
 +  // resolve allowlisted system family names so pages can't probe which
 +  // fonts the host has installed via CSS family-fallback timing. Empty
@@ -484,14 +484,14 @@ index c38cf414f9e09..865c42c6b3a09 100644
 +++ b/third_party/blink/renderer/platform/fonts/font_fallback_list.cc
 @@ -29,6 +29,7 @@
  #include "third_party/blink/renderer/platform/fonts/font_fallback_list.h"
- 
+
  #include "base/timer/elapsed_timer.h"
 +#include "third_party/blink/public/common/fingerprinting/font_allowlist.h"
  #include "third_party/blink/renderer/platform/font_family_names.h"
  #include "third_party/blink/renderer/platform/fonts/alternate_font_family.h"
  #include "third_party/blink/renderer/platform/fonts/font_cache.h"
 @@ -148,6 +149,21 @@ const FontData* FontFallbackList::GetFontData(
- 
+
    for (; curr_family; curr_family = curr_family->Next()) {
      family_index_++;
 +    // Lightweight-fork: silently skip macOS-specific font family names

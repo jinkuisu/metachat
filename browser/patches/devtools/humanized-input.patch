@@ -49,7 +49,7 @@ index 1519637194b4a..d562c9d90a510 100644
      "image_capture/image_capture_impl.cc",
 @@ -2864,6 +2867,8 @@ source_set("browser") {
          [ "file_system_access/file_path_watcher/file_path_watcher_stub.cc" ]
- 
+
      sources += [
 +      # Lightweight-fork: cursor overlay for humanizedClick visualization.
 +      "devtools/protocol/humanized_cursor_overlay_mac.mm",
@@ -85,7 +85,7 @@ index 4e6024318432d..b1ee252411521 100644
 @@ -704,6 +719,486 @@ Response BrowserHandler::CrashGpuProcess() {
    return Response::Success();
  }
- 
+
 +namespace {
 +
 +// Cubic bezier at t in [0,1].
@@ -576,7 +576,7 @@ index 916cdc7f05134..b407eac7a3902 100644
 @@ -101,6 +101,29 @@ class BrowserHandler : public DevToolsDomainHandler,
    Response Crash() override;
    Response CrashGpuProcess() override;
- 
+
 +  // Lightweight-fork: humanized click via internal WebMouseEvent dispatch.
 +  void HumanizedClick(const std::string& in_target_id,
 +                      double in_x,
@@ -817,7 +817,7 @@ index 9364acb5ca137..f9f104f2de9b9 100644
 @@ -1353,6 +1355,37 @@ void InputHandler::ImeSetComposition(
        std::move(closure));
  }
- 
+
 +namespace {
 +
 +// Cubic bezier with control points biased perpendicular to the straight line.

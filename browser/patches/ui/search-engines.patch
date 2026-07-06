@@ -18,7 +18,7 @@ index daf9e2d7df995..1fd5c8adb23f5 100644
 +++ b/components/search_engines/template_url_service.cc
 @@ -1341,8 +1341,10 @@ DefaultSearchManager* TemplateURLService::GetDefaultSearchManager() {
  }
- 
+
  const TemplateURL* TemplateURLService::GetDefaultSearchProvider() const {
 -  return loaded_ ? default_search_provider_.get()
 -                 : pre_loading_providers_->default_search_provider();
@@ -27,7 +27,7 @@ index daf9e2d7df995..1fd5c8adb23f5 100644
 +  // omnibox search submission, and search-engine-choice UI.
 +  return nullptr;
  }
- 
+
  const TemplateURLService::CategorizedTemplateUrls
 diff --git a/components/search_engines/template_url_starter_pack_data.cc b/components/search_engines/template_url_starter_pack_data.cc
 index 4ad0bb0eb1c07..fe23ba9e49053 100644
@@ -36,7 +36,7 @@ index 4ad0bb0eb1c07..fe23ba9e49053 100644
 @@ -57,6 +57,10 @@ const StarterPackEngine tabs = {
      .type = SEARCH_ENGINE_STARTER_PACK_TABS,
  };
- 
+
 +// Lightweight-fork: definition preserved (StarterPackId::kGemini is
 +// referenced from other TUs), but the engine is NOT added to engines[]
 +// below so the @gemini keyword and Ask-Gemini suggestion are never
@@ -47,7 +47,7 @@ index 4ad0bb0eb1c07..fe23ba9e49053 100644
 @@ -92,8 +96,14 @@ const StarterPackEngine ai_mode = {
      .type = SEARCH_ENGINE_STARTER_PACK_AI_MODE,
  };
- 
+
 +// Lightweight-fork (FINGERPRINT_ISOLATION_PLAN.md, no-AI policy):
 +// drop &gemini and &ai_mode so the @gemini keyword search engine and the
 +// AI-mode (udm=50) search starter-pack entry are never registered. The
@@ -58,5 +58,5 @@ index 4ad0bb0eb1c07..fe23ba9e49053 100644
 -    &bookmarks, &history, &tabs, &gemini, &page, &ai_mode,
 +    &bookmarks, &history, &tabs, &page,
  };
- 
+
  int GetDataVersion() {
