@@ -9015,7 +9015,7 @@ diff --git a/chrome/common/webui_url_constants.cc b/chrome/common/webui_url_cons
 diff --git a/chrome/common/webui_url_constants.h b/chrome/common/webui_url_constants.h
 --- a/chrome/common/webui_url_constants.h
 +++ b/chrome/common/webui_url_constants.h
-@@ -219,6 +219,7 @@ inline constexpr char kChromeUIMemoryInternalsHost[] = "memory-internals";
+@@ -219,2 +219,3 @@ inline constexpr char kChromeUIMemoryInternalsHost[] = "memory-internals";
 +inline constexpr char kChromeUIMetaChatHost[] = "metachat";
  inline constexpr char kChromeUIMetricsInternalsHost[] = "metrics-internals";
 
