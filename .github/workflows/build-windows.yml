@@ -127,7 +127,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "$env:SRC_DIR\build_overrides"
-          [System.IO.File]::WriteAllText("$env:SRC_DIR\build_overrides\pdfium.gni", "declare_args() { pdf_bundle_freetype_override = false }", [System.Text.UTF8Encoding]::new($false))
+          [System.IO.File]::WriteAllText("$env:SRC_DIR\build_overrides\pdfium.gni", "declare_args() { pdf_enable_v8_override = true; pdf_bundle_freetype_override = false }", [System.Text.UTF8Encoding]::new($false))
 
       - name: Download toolchains
         shell: pwsh
@@ -135,6 +135,15 @@ jobs:
           cd $env:SRC_DIR
           python3 tools\clang\scripts\update.py
           python3 tools\rust\update_rust.py
+
+      - name: Generate LASTCHANGE (required for build timestamp)
+        shell: pwsh
+        run: |
+          cd $env:SRC_DIR
+          $timestamp = git log -1 --format='%ct' HEAD
+          $commit = git log -1 --format='%H' HEAD
+          Set-Content -Path build/util/LASTCHANGE -Value "LASTCHANGE=$commit"
+          Set-Content -Path build/util/LASTCHANGE.committime -Value $timestamp -NoNewline
 
       - name: Configure GN
         shell: pwsh
