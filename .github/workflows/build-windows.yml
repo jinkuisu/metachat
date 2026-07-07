@@ -163,6 +163,7 @@ jobs:
             "dawn_enable_vulkan_validation_layers = false" + [char]10 +
             "angle_enable_vulkan_validation_layers = false"
           ))
+          gn gen out\Release_GN_x64
 
       - name: Build
         shell: pwsh
