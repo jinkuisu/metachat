@@ -136,7 +136,7 @@ jobs:
         run: |
           cd $env:SRC_DIR
           New-Item -ItemType Directory -Force -Path out\Release_GN_x64
-          [System.IO.File]::WriteAllText("out\Release_GN_x64\args.gn", (
+          [System.IO.File]::WriteAllText("$env:SRC_DIR\out\Release_GN_x64\args.gn", (
             "is_debug = false" + [char]10 +
             "is_component_build = false" + [char]10 +
             "symbol_level = 0" + [char]10 +
