@@ -153,7 +153,7 @@ jobs:
             "enable_printing = true" + [char]10 +
             "enable_print_preview = true" + [char]10 +
             "treat_warnings_as_errors = false" + [char]10 +
-            "google_api_key = \"\" + [char]10 +
+            'google_api_key = ""' + [char]10 +
             "use_unofficial_version_number = false" + [char]10 +
             "chrome_pgo_phase = 0" + [char]10 +
             "enable_extensions_core = true" + [char]10 +
