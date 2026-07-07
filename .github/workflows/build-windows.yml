@@ -12,6 +12,8 @@ env:
   CHROMIUM_COMMIT: ${{ github.event.inputs.chromium_commit || '150.0.7844.0' }}
   CHROMIUM_DIR: C:\chromium
   SRC_DIR: C:\chromium\src
+  # Use locally installed VS2022 instead of downloading a specific toolchain package
+  DEPOT_TOOLS_WIN_TOOLCHAIN: "0"
 
 jobs:
   build:
