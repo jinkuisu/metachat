@@ -88,9 +88,9 @@ index 4d1f2acf58e43..92ace9029b594 100644
 --- a/third_party/blink/renderer/controller/blink_initializer.cc
 +++ b/third_party/blink/renderer/controller/blink_initializer.cc
 @@ -30,6 +30,9 @@
-
+ 
  #include "third_party/blink/renderer/controller/blink_initializer.h"
-
+ 
 +// Lightweight-fork: needed for pre-warm Get() call below.
 +#include "third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.h"
 +
@@ -100,7 +100,7 @@ index 4d1f2acf58e43..92ace9029b594 100644
 @@ -169,6 +172,18 @@ void InitializeCommon(Platform* platform, mojo::BinderMap* binders) {
    // Initialize performance manager.
    RendererResourceCoordinatorImpl::MaybeInitialize();
-
+ 
 +  // Lightweight-fork: pre-warm the canvas-bridge client so its TCP +
 +  // WebSocket connect (~500-700ms to remote Win VPS) happens during
 +  // renderer startup instead of on the first canvas op. Without this
@@ -2313,3 +2313,4 @@ index 0000000000000..79e74cd3e5cef
 +}  // namespace blink::canvas_bridge
 +
 +#endif  // THIRD_PARTY_BLINK_RENDERER_PLATFORM_CANVAS_BRIDGE_CANVAS_BRIDGE_CODEC_H_
+ 

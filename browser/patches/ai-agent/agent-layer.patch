@@ -2449,7 +2449,7 @@ index 829029ee3fa85..7b77faaf1c9f6 100644
 @@ -2791,6 +2792,20 @@ void Browser::GetAIPageContent(
        }).Then(std::move(callback)));
  }
-
+ 
 +void Browser::RunAgentTask(
 +    content::WebContents* web_contents,
 +    const std::string& goal,
@@ -2485,7 +2485,7 @@ index f99921ebc6e41..8a76519f62992 100644
 +                              const std::string& final_text,
 +                              const std::string& steps_json)>
 +          callback) override;
-
+ 
  #if BUILDFLAG(ENABLE_PRINTING)
    void PrintCrossProcessSubframe(
 diff --git a/content/browser/humanized_click.cc b/content/browser/humanized_click.cc
@@ -2804,7 +2804,7 @@ index 16244802d3c31..69981c7e87a5a 100644
 @@ -476,6 +476,19 @@ void WebContentsDelegate::GetAIPageContent(
    std::move(callback).Run(std::string());
  }
-
+ 
 +void WebContentsDelegate::RunAgentTask(
 +    WebContents* web_contents,
 +    const std::string& goal,
@@ -2828,7 +2828,7 @@ index 01caa48d282c0..041ac53bf435f 100644
 @@ -897,6 +897,22 @@ class CONTENT_EXPORT WebContentsDelegate {
        bool include_actionable_elements,
        base::OnceCallback<void(const std::string&)> callback);
-
+ 
 +  // ChromiumFish: runs a native, in-browser AI agent task against
 +  // `web_contents` toward `goal` (natural language), driven by a configured
 +  // OpenAI-compatible LLM. `callback` reports completion with a success flag
@@ -2848,3 +2848,4 @@ index 01caa48d282c0..041ac53bf435f 100644
  #if BUILDFLAG(IS_ANDROID)
    // Allow delegate to override how to take a snapshot of this WebContents into
    // a HardwareBuffer. Return true if the delegate will execute callback with a
+ 

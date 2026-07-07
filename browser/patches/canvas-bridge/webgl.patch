@@ -17,13 +17,13 @@ index 172759394d7e0..91d91afabe393 100644
 --- a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
 +++ b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
 @@ -25,6 +25,7 @@
-
+ 
  #include "third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.h"
-
+ 
 +#include <cstring>
  #include <memory>
  #include <utility>
-
+ 
 @@ -59,6 +60,9 @@
  #include "media/base/video_frame.h"
  #include "media/renderers/paint_canvas_video_renderer.h"
@@ -59,11 +59,11 @@ index 172759394d7e0..91d91afabe393 100644
 +  }
    ContextGL()->BindBuffer(target, ObjectOrZero(buffer));
  }
-
+ 
 @@ -2692,6 +2708,20 @@ void WebGLRenderingContextBase::BufferDataImpl(GLenum target,
-
+ 
    buffer->SetSize(size);
-
+ 
 +  // Lightweight-fork: forward to canvas-bridge. Send raw bytes so the
 +  // server can populate its mirror buffer; for size-only calls (null
 +  // data) send an empty span and let server allocate untracked storage.
@@ -80,7 +80,7 @@ index 172759394d7e0..91d91afabe393 100644
 +
    ContextGL()->BufferData(target, static_cast<GLsizeiptr>(size), data, usage);
  }
-
+ 
 @@ -2844,6 +2874,11 @@ void WebGLRenderingContextBase::clear(GLbitfield mask) {
      }
      ContextGL()->Clear(mask);
@@ -105,7 +105,7 @@ index 172759394d7e0..91d91afabe393 100644
 +  }
    ContextGL()->ClearColor(r, g, b, a);
  }
-
+ 
 @@ -2899,6 +2940,11 @@ void WebGLRenderingContextBase::colorMask(GLboolean red,
  void WebGLRenderingContextBase::compileShader(WebGLShader* shader) {
    if (!ValidateWebGLProgramOrShader("compileShader", shader))
@@ -117,10 +117,10 @@ index 172759394d7e0..91d91afabe393 100644
 +  }
    ContextGL()->CompileShader(ObjectOrZero(shader));
  }
-
+ 
 @@ -3053,7 +3099,15 @@ void WebGLRenderingContextBase::copyTexSubImage2D(GLenum target,
  }
-
+ 
  WebGLBuffer* WebGLRenderingContextBase::createBuffer() {
 -  return MakeGarbageCollected<WebGLBuffer>(this);
 +  auto* buf = MakeGarbageCollected<WebGLBuffer>(this);
@@ -133,11 +133,11 @@ index 172759394d7e0..91d91afabe393 100644
 +  }
 +  return buf;
  }
-
+ 
  WebGLFramebuffer* WebGLRenderingContextBase::createFramebuffer() {
 @@ -3060,7 +3114,13 @@ WebGLTexture* WebGLRenderingContextBase::createTexture() {
  }
-
+ 
  WebGLProgram* WebGLRenderingContextBase::createProgram() {
 -  return MakeGarbageCollected<WebGLProgram>(this);
 +  auto* prog = MakeGarbageCollected<WebGLProgram>(this);
@@ -148,12 +148,12 @@ index 172759394d7e0..91d91afabe393 100644
 +  }
 +  return prog;
  }
-
+ 
  WebGLRenderbuffer* WebGLRenderingContextBase::createRenderbuffer() {
 @@ -3088,7 +3148,13 @@ WebGLShader* WebGLRenderingContextBase::createShader(GLenum type) {
      return nullptr;
    }
-
+ 
 -  return MakeGarbageCollected<WebGLShader>(this, type);
 +  auto* shader = MakeGarbageCollected<WebGLShader>(this, type);
 +  if (uint32_t id = EnsureBridgeWebGL()) {
@@ -163,7 +163,7 @@ index 172759394d7e0..91d91afabe393 100644
 +  }
 +  return shader;
  }
-
+ 
  void WebGLRenderingContextBase::cullFace(GLenum mode) {
 @@ -3256,6 +3322,11 @@ void WebGLRenderingContextBase::detachShader(WebGLProgram* program,
  void WebGLRenderingContextBase::disable(GLenum cap) {
@@ -180,7 +180,7 @@ index 172759394d7e0..91d91afabe393 100644
 @@ -3363,6 +3434,11 @@ void WebGLRenderingContextBase::drawArrays(GLenum mode,
    if (!ValidateDrawArrays("drawArrays"))
      return;
-
+ 
 +  // Lightweight-fork: forward to canvas-bridge.
 +  if (uint32_t id = EnsureBridgeWebGL()) {
 +    blink::canvas_bridge::CanvasBridgeClient::Get()->Send(
@@ -192,7 +192,7 @@ index 172759394d7e0..91d91afabe393 100644
 @@ -3374,6 +3450,12 @@ void WebGLRenderingContextBase::drawElements(GLenum mode,
    if (!ValidateDrawElements("drawElements", type, offset))
      return;
-
+ 
 +  // Lightweight-fork: forward to canvas-bridge.
 +  if (uint32_t id = EnsureBridgeWebGL()) {
 +    blink::canvas_bridge::CanvasBridgeClient::Get()->Send(
@@ -217,7 +217,7 @@ index 172759394d7e0..91d91afabe393 100644
      ApplyDepthAndStencilTest();
 @@ -3434,6 +3522,11 @@ void WebGLRenderingContextBase::enableVertexAttribArray(GLuint index) {
    }
-
+ 
    bound_vertex_array_object_->SetAttribEnabled(index, true);
 +  // Lightweight-fork: forward to canvas-bridge.
 +  if (uint32_t id = EnsureBridgeWebGL()) {
@@ -226,7 +226,7 @@ index 172759394d7e0..91d91afabe393 100644
 +  }
    ContextGL()->EnableVertexAttribArray(index);
  }
-
+ 
 @@ -3896,10 +3989,24 @@ ScriptValue WebGLRenderingContextBase::getParameter(ScriptState* script_state,
    switch (pname) {
      case GL_ACTIVE_TEXTURE:
@@ -410,7 +410,7 @@ index 172759394d7e0..91d91afabe393 100644
 @@ -4407,10 +4543,43 @@ WebGLShaderPrecisionFormat* WebGLRenderingContextBase::getShaderPrecisionFormat(
        return nullptr;
    }
-
+ 
 -  GLint range[2] = {0, 0};
 -  GLint precision = 0;
 -  ContextGL()->GetShaderPrecisionFormat(shader_type, precision_type, range,
@@ -458,7 +458,7 @@ index 172759394d7e0..91d91afabe393 100644
 @@ -4426,14 +4595,82 @@ WebGLRenderingContextBase::getSupportedExtensions() {
    if (isContextLost())
      return std::nullopt;
-
+ 
 +  // Lightweight-fork: return the canonical Win-Chrome-on-WARP extension
 +  // list — captured side-by-side against chrome.exe 148.0.7778.179 on a
 +  // cloud Win Server 2025 VM (no GPU, ANGLE falls back to D3D11 WARP).
@@ -542,7 +542,7 @@ index 172759394d7e0..91d91afabe393 100644
 -
    return result;
  }
-
+ 
 @@ -4972,6 +5209,12 @@ void WebGLRenderingContextBase::linkProgram(WebGLProgram* program) {
      ContextGL()->GenQueriesEXT(1, &query);
      ContextGL()->BeginQueryEXT(GL_PROGRAM_COMPLETION_QUERY_CHROMIUM, query);
@@ -564,11 +564,11 @@ index 172759394d7e0..91d91afabe393 100644
 -
    uint8_t* data = static_cast<uint8_t*>(pixels->BaseAddressMaybeShared()) +
                    offset_in_bytes.ValueOrDie();
-
+ 
 @@ -5245,6 +5486,8 @@ void WebGLRenderingContextBase::ReadPixelsHelper(GLint x,
      data = buffer->data();
    }
-
+ 
 +  ClearIfComposited(kClearCallerOther);
 +
    // Last-chance early-out, in case somehow the context was lost during
@@ -604,7 +604,7 @@ index 172759394d7e0..91d91afabe393 100644
 +    }
 +  }
  }
-
+ 
  void WebGLRenderingContextBase::RenderbufferStorageImpl(
 @@ -5370,6 +5638,12 @@ void WebGLRenderingContextBase::shaderSource(WebGLShader* shader,
    DCHECK(ascii_string.Is8Bit() && ascii_string.ContainsOnlyAsciiOrEmpty());
@@ -633,7 +633,7 @@ index 172759394d7e0..91d91afabe393 100644
      if (program)
        program->OnAttached();
 @@ -7475,6 +7755,13 @@ void WebGLRenderingContextBase::vertexAttribPointer(GLuint index,
-
+ 
    bound_vertex_array_object_->SetArrayBufferForAttrib(
        index, bound_array_buffer_.Get());
 +  // Lightweight-fork: forward to canvas-bridge.
@@ -657,7 +657,7 @@ index 172759394d7e0..91d91afabe393 100644
 +  }
    ContextGL()->Viewport(x, y, width, height);
  }
-
+ 
 @@ -9346,4 +9638,38 @@ bool WebGLRenderingContextBase::checkProgramCompletionQueryAvailable(
    }
    return false;
@@ -704,7 +704,7 @@ index aaee965c67969..ad5a589cf1579 100644
 @@ -690,6 +690,14 @@ class MODULES_EXPORT WebGLRenderingContextBase
    static constexpr size_t kMaximumSupportedArrayBufferSize =
        ::partition_alloc::internal::MaxDirectMapped();
-
+ 
 + public:
 +  // Lightweight-fork: canvas-bridge wiring. Returns the per-context bridge
 +  // canvas id (lazy-allocated on first call), or 0 if the bridge is not
@@ -717,9 +717,9 @@ index aaee965c67969..ad5a589cf1579 100644
    // Implementation helpers.
    friend class ScopedPixelLocalStorageInterrupt;
 @@ -2004,6 +2012,12 @@ class MODULES_EXPORT WebGLRenderingContextBase
-
+ 
    const Platform::WebGLContextType context_type_;
-
+ 
 +  // Lightweight-fork: canvas-bridge state. bridge_webgl_id_ is 0 until the
 +  // first call to EnsureBridgeWebGL() succeeds in allocating an id from
 +  // the bridge and sending CreateWebGL. After that every WebGL op forwards
@@ -727,5 +727,6 @@ index aaee965c67969..ad5a589cf1579 100644
 +  uint32_t bridge_webgl_id_ = 0;
 +
    bool IsPaintable() const final { return GetDrawingBuffer(); }
-
+ 
    void HoldReferenceToDrawingBuffer(DrawingBuffer*);
+ 

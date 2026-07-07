@@ -20,7 +20,7 @@ index e60e454815d33..dea9295f2fe06 100644
 +++ b/third_party/blink/renderer/modules/webaudio/audio_context.cc
 @@ -5,3 +1,4 @@
  #include "third_party/blink/renderer/modules/webaudio/audio_context.h"
-
+ 
 +#include "base/logging.h"
  #include <atomic>
 @@ -19,6 +19,7 @@
@@ -34,7 +34,7 @@ index e60e454815d33..dea9295f2fe06 100644
 @@ -79,14 +80,6 @@ unsigned hardware_context_count = 0;
  // This initializes the internal id for the context.
  uint32_t context_id = 0;
-
+ 
 -// When the client does not have enough permission, the outputLatency property
 -// is quantized by 8ms to reduce the precision for privacy concerns.
 -constexpr double kOutputLatencyQuatizingFactor = 0.008;
@@ -48,17 +48,17 @@ index e60e454815d33..dea9295f2fe06 100644
    kCreate,
 @@ -618,7 +611,7 @@ AudioContext::AudioContext(LocalDOMWindow& window,
    }
-
+ 
    destination_node_ = RealtimeAudioDestinationNode::Create(
 -      this, sink_descriptor_, latency_hint, sample_rate,
 +      this, sink_descriptor_, latency_hint, fingerprinting::Current().audio_sample_rate,
        update_echo_cancellation_on_first_start);
-
+ 
    TRACE_EVENT2("webaudio", "AudioContext::AudioContext", "UUID", Uuid(),
 @@ -1149,17 +1142,20 @@ double AudioContext::baseLatency() const {
    DCHECK_CALLED_ON_VALID_SEQUENCE(main_thread_sequence_checker_);
    DCHECK(destination());
-
+ 
 -  return base_latency_;
 +  // MetaChat: DVLOG - 记录音频指纹参数
 +  DVLOG(1) << "MetaChat: audio fingerprint: sample_rate="
@@ -66,11 +66,11 @@ index e60e454815d33..dea9295f2fe06 100644
 +           << " base_latency=" << fingerprinting::Current().audio_base_latency;
 +  return fingerprinting::Current().audio_base_latency;
  }
-
+ 
  double AudioContext::outputLatency() const {
    DCHECK_CALLED_ON_VALID_SEQUENCE(main_thread_sequence_checker_);
    DCHECK(destination());
-
+ 
 -  DeferredTaskHandler::GraphAutoLocker locker(GetDeferredTaskHandler());
 -
 -  double factor = GetOutputLatencyQuantizingFactor();
@@ -79,12 +79,12 @@ index e60e454815d33..dea9295f2fe06 100644
 +           << fingerprinting::Current().audio_output_latency;
 +  return fingerprinting::Current().audio_output_latency;
  }
-
+ 
  AudioPlaybackStats* AudioContext::playbackStats() {
 @@ -1648,13 +1638,6 @@ void AudioContext::DidInitialPermissionCheck(
        std::move(observer));
  }
-
+ 
 -double AudioContext::GetOutputLatencyQuantizingFactor() const {
 -  return microphone_permission_status_ ==
 -                 mojom::blink::PermissionStatus::GRANTED
@@ -94,17 +94,17 @@ index e60e454815d33..dea9295f2fe06 100644
 -
  void AudioContext::NotifySetSinkIdBegins() {
    DCHECK_CALLED_ON_VALID_SEQUENCE(main_thread_sequence_checker_);
-
+ 
 diff --git a/third_party/blink/renderer/modules/webaudio/audio_context.h b/third_party/blink/renderer/modules/webaudio/audio_context.h
 index b15ba3892f28e..e8b263d46c627 100644
 --- a/third_party/blink/renderer/modules/webaudio/audio_context.h
 +++ b/third_party/blink/renderer/modules/webaudio/audio_context.h
 @@ -356,7 +356,6 @@ class MODULES_EXPORT AudioContext final
-
+ 
    void DidInitialPermissionCheck(mojom::blink::PermissionDescriptorPtr,
                                   mojom::blink::PermissionStatusWithDetailsPtr);
 -  double GetOutputLatencyQuantizingFactor() const;
-
+ 
    void InitializeMediaDeviceService();
    void UninitializeMediaDeviceService();
 diff --git a/third_party/blink/renderer/modules/webaudio/offline_audio_context.cc b/third_party/blink/renderer/modules/webaudio/offline_audio_context.cc
@@ -123,7 +123,7 @@ index a63cffefb5522..0bc2761475924 100644
 @@ -425,6 +427,165 @@ void OfflineAudioContext::FireCompletionEvent() {
        return;
      }
-
+ 
 +    // Fingerprint isolation (audio fingerprint).
 +    //
 +    // the commercial fingerprinter's audio probe is OfflineAudioContext(1ch, 44100, 44100)
@@ -292,10 +292,10 @@ index c02c792af301a..189fa86eb37dd 100644
 +++ b/third_party/blink/renderer/modules/webaudio/offline_audio_destination_handler.cc
 @@ -5,11 +5,15 @@
  #include "third_party/blink/renderer/modules/webaudio/offline_audio_destination_handler.h"
-
+ 
  #include <algorithm>
 +#include <vector>
-
+ 
  #include "base/compiler_specific.h"
 +#include "base/containers/span.h"
  #include "base/trace_event/typed_macros.h"
@@ -320,7 +320,7 @@ index c02c792af301a..189fa86eb37dd 100644
 @@ -191,16 +199,38 @@ void OfflineAudioDestinationHandler::DoOfflineRendering() {
      uint32_t frames_available_to_copy = std::min(
          frames_to_process_, GetDeferredTaskHandler().RenderQuantumFrames());
-
+ 
 +    // Per-seed audio fingerprint isolation, applied on EVERY platform
 +    // including Mac. 2026-06-16: the previous `#if !BUILDFLAG(IS_MAC)`
 +    // carve-out existed because AudioChannel::MutableSpan() SIGSEGV'd
@@ -358,5 +358,6 @@ index c02c792af301a..189fa86eb37dd 100644
 +              base::as_bytes(base::allow_nonunique_obj,
 +                             base::span<const float>(isolation_scratch)));
      }
-
+ 
      frames_processed_ += frames_available_to_copy;
+ 

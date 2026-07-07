@@ -17,9 +17,9 @@ index 98b21d5fad16d..0905678103038 100644
 --- a/net/base/features.cc
 +++ b/net/base/features.cc
 @@ -607,7 +607,15 @@ BASE_FEATURE(kRestrictAbusePortsOnLocalhost, base::FEATURE_ENABLED_BY_DEFAULT);
-
+ 
  BASE_FEATURE(kTLSTrustAnchorIDs, base::FEATURE_DISABLED_BY_DEFAULT);
-
+ 
 -BASE_FEATURE(kTlsMldsaSignatures, base::FEATURE_ENABLED_BY_DEFAULT);
 +// ChromiumFish: default DISABLED. Chrome 149+ added 3 ML-DSA (post-quantum)
 +// signature algorithms (0x904-0x906) to the TLS verify_sigalgs extension.
@@ -30,7 +30,7 @@ index 98b21d5fad16d..0905678103038 100644
 +// Chrome 148 byte-exactly. (Operators wanting upstream behavior can pass
 +// --enable-features=TlsMldsaSignatures.)
 +BASE_FEATURE(kTlsMldsaSignatures, base::FEATURE_DISABLED_BY_DEFAULT);
-
+ 
  #if BUILDFLAG(CHROME_ROOT_STORE_SUPPORTED)
  BASE_FEATURE(kVerifyMTCs, base::FEATURE_DISABLED_BY_DEFAULT);
 diff --git a/net/socket/ssl_client_socket_impl.cc b/net/socket/ssl_client_socket_impl.cc
@@ -38,9 +38,9 @@ index 307f596f3e017..718b2cfa5fd58 100644
 --- a/net/socket/ssl_client_socket_impl.cc
 +++ b/net/socket/ssl_client_socket_impl.cc
 @@ -869,20 +869,15 @@ int SSLClientSocketImpl::Init() {
-
+ 
    SSL_set_permute_extensions(ssl_.get(), 1);
-
+ 
 -  // Configure BoringSSL to send Trust Anchor IDs, if provided.
 -  if (ssl_config_.trust_anchor_ids.has_value()) {
 -    if (!SSL_set1_requested_trust_anchors(
@@ -64,6 +64,7 @@ index 307f596f3e017..718b2cfa5fd58 100644
 +  // this up. Skipping it makes our ClientHello extension SET match
 +  // Chrome 148's exactly (order is randomized by SSL_set_permute_extensions
 +  // already, so order is non-distinguishing).
-
+ 
    // The compliance policy must be the last thing configured in order to have
    // defined behavior.
+ 

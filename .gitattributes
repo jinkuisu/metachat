@@ -1,2 +1,4 @@
-﻿*.patch text eol=lf
+*.patch text eol=lf
 *.diff text eol=lf
+# browser/patches/*.patch: binary to prevent CRLF corruption (breaks git apply)
+browser/patches/*.patch binary

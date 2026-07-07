@@ -60,7 +60,7 @@ index 2a199c115931e..6736d357c5aff 100644
 @@ -1310,7 +1317,31 @@ String HTMLCanvasElement::ToDataURLInternal(
        ImageEncoderUtils::ToEncodingMimeType(
            mime_type, ImageEncoderUtils::kEncodeReasonToDataURL);
-
+ 
 -  scoped_refptr<StaticBitmapImage> image_bitmap = Snapshot(source_buffer);
 +  // canvas-bridge: when configured and this canvas has a bridge id,
 +  // pull pixels from the remote render server and feed them through
@@ -93,7 +93,7 @@ index 2a199c115931e..6736d357c5aff 100644
 @@ -1365,6 +1396,10 @@ String HTMLCanvasElement::toDataURL(const String& mime_type,
      return String();
    }
-
+ 
 +  // Lightweight-fork: we no longer short-circuit to "data:," on readback
 +  // because that itself was a strong automation tell. Real pixels are
 +  // encoded and returned (routed through the canvas bridge when enabled).
@@ -104,7 +104,7 @@ index 2a199c115931e..6736d357c5aff 100644
 @@ -1391,6 +1426,9 @@ void HTMLCanvasElement::toBlob(V8BlobCallback* callback,
    if (!GetExecutionContext())
      return;
-
+ 
 +  // Lightweight-fork: see toDataURL — readback now flows through normally
 +  // with per-pixel isolation applied at the byte-level readback sites.
 +
@@ -116,9 +116,9 @@ index 2b023e1a62915..39a1cda23e912 100644
 --- a/third_party/blink/renderer/core/html/canvas/html_canvas_element.h
 +++ b/third_party/blink/renderer/core/html/canvas/html_canvas_element.h
 @@ -444,6 +444,12 @@ class CORE_EXPORT HTMLCanvasElement final
-
+ 
    bool did_notify_listeners_for_current_frame_ = false;
-
+ 
 + public:
 +  // canvas-bridge: opaque server-allocated handle, 0 means unmapped.
 +  // Allocated lazily on first forwarded op from base_rendering_context_2d.cc.
@@ -126,7 +126,7 @@ index 2b023e1a62915..39a1cda23e912 100644
 + private:
 +
    scoped_refptr<StaticBitmapImage> transparent_image_;
-
+ 
    // Paint flags set based on CSS properties, which must be propagated to the
 diff --git a/third_party/blink/renderer/core/html/canvas/text_metrics.h b/third_party/blink/renderer/core/html/canvas/text_metrics.h
 index 3d2c354897fad..890087fca42a0 100644
@@ -135,7 +135,7 @@ index 3d2c354897fad..890087fca42a0 100644
 @@ -75,6 +75,25 @@ class CORE_EXPORT TextMetrics final : public ScriptWrappable {
    static float GetFontBaseline(const V8CanvasTextBaseline::Enum,
                                 const SimpleFontData&);
-
+ 
 +  // canvas-bridge: overwrite the metrics that bot-detection services's font probe
 +  // reads (width + actualBoundingBox ascent/descent + fontBoundingBox
 +  // ascent/descent). Called after the normal local-shaper construction
@@ -156,7 +156,7 @@ index 3d2c354897fad..890087fca42a0 100644
 +  }
 +
    unsigned getIndexFromOffset(double x);
-
+ 
    const HeapVector<Member<DOMRectReadOnly>> getSelectionRects(
 diff --git a/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc b/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc
 index 1422fe89b171d..1ab38296b988d 100644
@@ -176,7 +176,7 @@ index 1422fe89b171d..1ab38296b988d 100644
 @@ -409,6 +413,9 @@ ImageData* BaseRenderingContext2D::getImageDataInternal(
    validate_and_create_params.default_color_space =
        GetDefaultImageDataColorSpace();
-
+ 
 +  // Lightweight-fork: kCanvasReadbackEnabled is always true now; isolation
 +  // happens below after the readback completes.
 +
@@ -186,7 +186,7 @@ index 1422fe89b171d..1ab38296b988d 100644
 @@ -488,8 +495,34 @@ ImageData* BaseRenderingContext2D::getImageDataInternal(
    if (!image_data)
      return nullptr;
-
+ 
 +  // canvas-bridge: route this readback to the remote render server when
 +  // one is configured. Falls back to local snapshot on any failure.
 +  // When the bridge succeeds, the returned pixels ARE authoritative
@@ -236,12 +236,12 @@ index 1422fe89b171d..1ab38296b988d 100644
 +  // Deliberately NO `else if (bridge_readback_done)` isolation step here.
 +  // Bridge-returned pixels are passed through untouched (see comment at the
 +  // bridge readback block above for rationale).
-
+ 
    return image_data;
  }
 @@ -650,6 +694,10 @@ V8CanvasTextAlign BaseRenderingContext2D::textAlign() const {
  }
-
+ 
  void BaseRenderingContext2D::setTextAlign(const V8CanvasTextAlign align) {
 +  if (uint32_t id = EnsureBridgeCanvas()) {
 +    blink::canvas_bridge::CanvasBridgeClient::Get()->Send(
@@ -249,9 +249,9 @@ index 1422fe89b171d..1ab38296b988d 100644
 +  }
    GetState().SetTextAlign(align.AsEnum());
  }
-
+ 
 @@ -659,6 +707,11 @@ V8CanvasTextBaseline BaseRenderingContext2D::textBaseline() const {
-
+ 
  void BaseRenderingContext2D::setTextBaseline(
      const V8CanvasTextBaseline baseline) {
 +  if (uint32_t id = EnsureBridgeCanvas()) {
@@ -261,11 +261,11 @@ index 1422fe89b171d..1ab38296b988d 100644
 +  }
    GetState().SetTextBaseline(baseline.AsEnum());
  }
-
+ 
 @@ -806,6 +859,11 @@ void BaseRenderingContext2D::setFont(const String& new_font) {
      return;
    }
-
+ 
 +  if (uint32_t id = EnsureBridgeCanvas()) {
 +    blink::canvas_bridge::CanvasBridgeClient::Get()->Send(
 +        blink::canvas_bridge::MsgBuilder::SetFont(id, new_font));
@@ -276,7 +276,7 @@ index 1422fe89b171d..1ab38296b988d 100644
      return;
 @@ -859,6 +917,12 @@ void BaseRenderingContext2D::setDirection(const V8CanvasDirection direction) {
  }
-
+ 
  void BaseRenderingContext2D::fillText(const String& text, double x, double y) {
 +  if (uint32_t id = EnsureBridgeCanvas()) {
 +    blink::canvas_bridge::CanvasBridgeClient::Get()->Send(
@@ -329,7 +329,7 @@ index 1422fe89b171d..1ab38296b988d 100644
 @@ -1147,9 +1229,35 @@ TextMetrics* BaseRenderingContext2D::measureText(const String& text) {
    TextDirection direction =
        ToTextDirection(state.GetDirection(), host, computed_style);
-
+ 
 -  return MakeGarbageCollected<TextMetrics>(
 +  TextMetrics* metrics = MakeGarbageCollected<TextMetrics>(
        font, direction, state.GetTextBaseline(), state.GetTextAlign(), text,
@@ -361,12 +361,12 @@ index 1422fe89b171d..1ab38296b988d 100644
 +
 +  return metrics;
  }
-
+ 
  String BaseRenderingContext2D::lang() const {
 @@ -1535,4 +1643,41 @@ DOMMatrix* BaseRenderingContext2D::DrawElementInternal(
                                           result_transform.Is2dTransform());
  }
-
+ 
 +uint32_t BaseRenderingContext2D::EnsureBridgeCanvas() {
 +  auto* bridge = blink::canvas_bridge::CanvasBridgeClient::Get();
 +  if (!bridge) {
@@ -427,9 +427,9 @@ index 6b85db957ef90..402140c747456 100644
 --- a/third_party/blink/renderer/modules/canvas/canvas2d/canvas_2d_recorder_context.cc
 +++ b/third_party/blink/renderer/modules/canvas/canvas2d/canvas_2d_recorder_context.cc
 @@ -4,6 +4,9 @@
-
+ 
  #include "third_party/blink/renderer/modules/canvas/canvas2d/canvas_2d_recorder_context.h"
-
+ 
 +#include "third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.h"
 +#include "third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_codec.h"
 +
@@ -438,7 +438,7 @@ index 6b85db957ef90..402140c747456 100644
  #include <cmath>
 @@ -388,6 +391,10 @@ Canvas2DRecorderContext::~Canvas2DRecorderContext() {
  }
-
+ 
  void Canvas2DRecorderContext::save() {
 +  if (uint32_t id = MaybeBridgeCanvas2DId()) {
 +    blink::canvas_bridge::CanvasBridgeClient::Get()->Send(
@@ -449,7 +449,7 @@ index 6b85db957ef90..402140c747456 100644
    }
 @@ -415,6 +422,10 @@ void Canvas2DRecorderContext::save() {
  }
-
+ 
  void Canvas2DRecorderContext::restore(ExceptionState& exception_state) {
 +  if (uint32_t id = MaybeBridgeCanvas2DId()) {
 +    blink::canvas_bridge::CanvasBridgeClient::Get()->Send(
@@ -475,7 +475,7 @@ index 6b85db957ef90..402140c747456 100644
 @@ -1040,6 +1058,14 @@ void Canvas2DRecorderContext::setFillStyle(v8::Isolate* isolate,
                                             ExceptionState& exception_state) {
    ValidateStateStack();
-
+ 
 +  if (value->IsString()) {
 +    if (uint32_t id = MaybeBridgeCanvas2DId()) {
 +      String css = ToCoreString(isolate, value.As<v8::String>());
@@ -513,7 +513,7 @@ index 6b85db957ef90..402140c747456 100644
      return;
 @@ -1346,6 +1382,11 @@ void Canvas2DRecorderContext::setFilter(
  }
-
+ 
  void Canvas2DRecorderContext::scale(double sx, double sy) {
 +  if (uint32_t id = MaybeBridgeCanvas2DId()) {
 +    blink::canvas_bridge::CanvasBridgeClient::Get()->Send(
@@ -525,7 +525,7 @@ index 6b85db957ef90..402140c747456 100644
    cc::PaintCanvas* c = GetOrCreatePaintCanvas();
 @@ -1374,6 +1415,11 @@ void Canvas2DRecorderContext::scale(double sx, double sy) {
  }
-
+ 
  void Canvas2DRecorderContext::rotate(double angle_in_radians) {
 +  if (uint32_t id = MaybeBridgeCanvas2DId()) {
 +    blink::canvas_bridge::CanvasBridgeClient::Get()->Send(
@@ -537,7 +537,7 @@ index 6b85db957ef90..402140c747456 100644
      return;
 @@ -1400,6 +1446,11 @@ void Canvas2DRecorderContext::rotate(double angle_in_radians) {
  }
-
+ 
  void Canvas2DRecorderContext::translate(double tx, double ty) {
 +  if (uint32_t id = MaybeBridgeCanvas2DId()) {
 +    blink::canvas_bridge::CanvasBridgeClient::Get()->Send(
@@ -558,12 +558,12 @@ index 6b85db957ef90..402140c747456 100644
 +            static_cast<float>(m21), static_cast<float>(m22),
 +            static_cast<float>(dx), static_cast<float>(dy)));
 +  }
-
+ 
    resetTransform();
    transform(m11, m12, m21, m22, dx, dy);
 @@ -1566,6 +1624,10 @@ AffineTransform Canvas2DRecorderContext::GetTransform() const {
  }
-
+ 
  void Canvas2DRecorderContext::beginPath() {
 +  if (uint32_t id = MaybeBridgeCanvas2DId()) {
 +    blink::canvas_bridge::CanvasBridgeClient::Get()->Send(
@@ -571,10 +571,10 @@ index 6b85db957ef90..402140c747456 100644
 +  }
    Clear();
  }
-
+ 
 @@ -1666,6 +1728,10 @@ void Canvas2DRecorderContext::fill(const V8CanvasFillRule& winding) {
  }
-
+ 
  void Canvas2DRecorderContext::FillImpl(SkPathFillType winding_rule) {
 +  if (uint32_t id = MaybeBridgeCanvas2DId()) {
 +    blink::canvas_bridge::CanvasBridgeClient::Get()->Send(
@@ -585,7 +585,7 @@ index 6b85db957ef90..402140c747456 100644
  }
 @@ -1690,6 +1756,10 @@ void Canvas2DRecorderContext::FillPathImpl(Path2D* dom_path,
  }
-
+ 
  void Canvas2DRecorderContext::stroke() {
 +  if (uint32_t id = MaybeBridgeCanvas2DId()) {
 +    blink::canvas_bridge::CanvasBridgeClient::Get()->Send(
@@ -597,7 +597,7 @@ index 6b85db957ef90..402140c747456 100644
 @@ -1713,6 +1783,13 @@ void Canvas2DRecorderContext::fillRect(double x,
      return;
    }
-
+ 
 +  if (uint32_t id = MaybeBridgeCanvas2DId()) {
 +    blink::canvas_bridge::CanvasBridgeClient::Get()->Send(
 +        blink::canvas_bridge::MsgBuilder::FillRect(
@@ -611,7 +611,7 @@ index 6b85db957ef90..402140c747456 100644
 @@ -1766,6 +1843,13 @@ void Canvas2DRecorderContext::strokeRect(double x,
      return;
    }
-
+ 
 +  if (uint32_t id = MaybeBridgeCanvas2DId()) {
 +    blink::canvas_bridge::CanvasBridgeClient::Get()->Send(
 +        blink::canvas_bridge::MsgBuilder::StrokeRect(
@@ -632,7 +632,7 @@ index 6b85db957ef90..402140c747456 100644
 +            id, static_cast<float>(x), static_cast<float>(y),
 +            static_cast<float>(width), static_cast<float>(height)));
 +  }
-
+ 
    cc::PaintCanvas* c = GetOrCreatePaintCanvas();
    if (!c) {
 diff --git a/third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.cc b/third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.cc
@@ -640,9 +640,9 @@ index 8c8b5f5cb096a..2f859cdce97cd 100644
 --- a/third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.cc
 +++ b/third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.cc
 @@ -35,6 +35,9 @@
-
+ 
  #include "third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.h"
-
+ 
 +#include "third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.h"
 +#include "third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_codec.h"
 +
@@ -651,7 +651,7 @@ index 8c8b5f5cb096a..2f859cdce97cd 100644
  #include <ostream>  // IWYU pragma: keep (needed by String::Number(int), https://github.com/clangd/clangd/issues/2053)
 @@ -75,6 +78,10 @@ String StrFloatCat(StringView leading, float value, StringView trailing) {
  }  // namespace
-
+ 
  void CanvasPath::closePath() {
 +  if (uint32_t id = MaybeBridgeCanvas2DId()) {
 +    blink::canvas_bridge::CanvasBridgeClient::Get()->Send(
@@ -685,7 +685,7 @@ index 8c8b5f5cb096a..2f859cdce97cd 100644
 @@ -159,6 +174,11 @@ void CanvasPath::quadraticCurveTo(double double_cpx,
    float x = base::saturated_cast<float>(double_x);
    float y = base::saturated_cast<float>(double_y);
-
+ 
 +  if (uint32_t id = MaybeBridgeCanvas2DId()) {
 +    blink::canvas_bridge::CanvasBridgeClient::Get()->Send(
 +        blink::canvas_bridge::MsgBuilder::QuadraticCurveTo(id, cpx, cpy, x, y));
@@ -734,9 +734,9 @@ index 117bddcc7b266..f5446078bd706 100644
 --- a/third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.h
 +++ b/third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.h
 @@ -65,6 +65,11 @@ class MODULES_EXPORT CanvasPath : public GarbageCollectedMixin {
-
+ 
    virtual ~CanvasPath() = default;
-
+ 
 +  // canvas-bridge: returns the per-canvas bridge id when this path's
 +  // owning context is being mirrored to a remote render server, 0
 +  // otherwise. Path2D returns 0; BaseRenderingContext2D overrides.
@@ -745,3 +745,4 @@ index 117bddcc7b266..f5446078bd706 100644
    void closePath();
    void moveTo(double double_x, double double_y);
    void lineTo(double double_x, double double_y);
+ 
