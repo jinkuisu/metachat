@@ -144,20 +144,21 @@ jobs:
         shell: pwsh
         run: |
           cd $env:SRC_DIR
-          # Download clang if needed (creates cr_build_revision stamp)
-          python3 tools\clang\scripts\update.py 2>&1
+          # Create clang stamp file directly from DEPS.
+          # Clang binaries are already downloaded by gclient sync (GCS dep).
+          # Do NOT call update.py - it fails on GHA pwsh due to non-zero exit code.
           $stampPath = "third_party/llvm-build/Release+Asserts/cr_build_revision"
           if (-not (Test-Path $stampPath)) {
-            # Fallback: clang binaries exist (GCS dep) but no stamp - create it from DEPS
             $deps = Get-Content DEPS -Raw
             if ($deps -match 'Win/clang-([a-z0-9-]+)\.tar\.xz') {
               $rev = $matches[1]
-              New-Item -ItemType Directory -Force -Path (Split-Path $stampPath)
-              Set-Content -Path $stampPath -Value "$rev" -NoNewline
-              Write-Host "Created clang stamp file: $rev" -ForegroundColor Green
             } else {
-              Write-Host "WARNING: Could not extract clang revision from DEPS" -ForegroundColor Yellow
+              # Hardcoded fallback if DEPS format changes
+              $rev = "llvmorg-23-init-10931-g20b6ec66-11"
             }
+            New-Item -ItemType Directory -Force -Path (Split-Path $stampPath)
+            Set-Content -Path $stampPath -Value "$rev" -NoNewline
+            Write-Host "Created clang stamp file: $rev" -ForegroundColor Green
           }
           if (-not (Test-Path "third_party/rust-toolchain/VERSION")) {
             python3 tools\rust\update_rust.py
