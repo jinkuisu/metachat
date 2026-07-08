@@ -127,7 +127,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "$env:SRC_DIR\build_overrides"
-          [System.IO.File]::WriteAllText("$env:SRC_DIR\build_overrides\pdfium.gni", "declare_args() { pdf_enable_v8_override = true; pdf_bundle_freetype_override = false }", [System.Text.UTF8Encoding]::new($false))
+          [System.IO.File]::WriteAllText("$env:SRC_DIR\build_overrides\pdfium.gni", "declare_args() {" + [char]10 + "  pdf_enable_v8_override = true" + [char]10 + "  pdf_bundle_freetype_override = false" + [char]10 + "}", [System.Text.UTF8Encoding]::new($false))
 
       - name: Download toolchains
         shell: pwsh
