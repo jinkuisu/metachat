@@ -145,8 +145,9 @@ jobs:
         run: |
           cd $env:SRC_DIR
           python3 tools\clang\scripts\update.py
-          python3 tools\rust\update_rust.py
-
+          if (-not (Test-Path "third_party/rust-toolchain/VERSION")) {
+            python3 tools\rust\update_rust.py
+          }
       - name: Run gclient hooks (Node.js + npm deps)
         shell: pwsh
         run: |
@@ -214,4 +215,5 @@ jobs:
         with:
           name: metachat-browser-windows
           path: metachat-browser-windows.zip
+
 
