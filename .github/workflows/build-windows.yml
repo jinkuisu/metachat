@@ -57,7 +57,7 @@ jobs:
           cd $env:CHROMIUM_DIR
           fetch --nohooks --no-history chromium
           cd src
-          # Chromium 150.0.7844.0 閳?matched to ChromiumFish version
+          # Chromium 150.0.7844.0  (matched to ChromiumFish version)
           git fetch origin tag $env:CHROMIUM_COMMIT --depth=1
           git checkout $env:CHROMIUM_COMMIT
           gclient sync --with_branch_heads --with_tags --nohooks -D
@@ -146,6 +146,12 @@ jobs:
           cd $env:SRC_DIR
           python3 tools\clang\scripts\update.py
           python3 tools\rust\update_rust.py
+
+      - name: Run gclient hooks (Node.js + npm deps)
+        shell: pwsh
+        run: |
+          cd $env:CHROMIUM_DIR
+          gclient runhooks
 
       - name: Generate LASTCHANGE (required for build timestamp)
         shell: pwsh
