@@ -132,7 +132,7 @@ jobs:
             "  pdf_enable_v8_override = true" + [char]10 +
             "  pdf_enable_xfa_override = false" + [char]10 +
             "  pdf_use_partition_alloc_override = false" + [char]10 +
-            "  pdf_use_skia_override = false" + [char]10 +
+            "  pdf_use_skia_override = true" + [char]10 +
             '  pdf_skia_font_manager_target_override = ""' + [char]10 +
             "  pdf_enable_fontations_override = false" + [char]10 +
             "  pdf_enable_rust_png_override = true" + [char]10 +
