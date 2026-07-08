@@ -130,7 +130,7 @@ jobs:
           [System.IO.File]::WriteAllText("$env:SRC_DIR\build_overrides\pdfium.gni", (
             "declare_args() {" + [char]10 +
             "  pdf_enable_v8_override = true" + [char]10 +
-            "  pdf_enable_xfa_override = true" + [char]10 +
+            "  pdf_enable_xfa_override = false" + [char]10 +
             "  pdf_use_partition_alloc_override = false" + [char]10 +
             "  pdf_use_skia_override = false" + [char]10 +
             '  pdf_skia_font_manager_target_override = ""' + [char]10 +
