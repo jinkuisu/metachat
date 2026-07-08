@@ -1,4 +1,4 @@
-﻿name: Build MetaChat Browser (Windows)
+name: Build MetaChat Browser (Windows)
 
 on:
   workflow_dispatch:
