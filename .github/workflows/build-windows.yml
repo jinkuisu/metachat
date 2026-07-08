@@ -1,4 +1,4 @@
-name: Build MetaChat Browser (Windows)
+﻿name: Build MetaChat Browser (Windows)
 
 on:
   workflow_dispatch:
@@ -57,7 +57,7 @@ jobs:
           cd $env:CHROMIUM_DIR
           fetch --nohooks --no-history chromium
           cd src
-          # Chromium 150.0.7844.0 鈥?matched to ChromiumFish version
+          # Chromium 150.0.7844.0 閳?matched to ChromiumFish version
           git fetch origin tag $env:CHROMIUM_COMMIT --depth=1
           git checkout $env:CHROMIUM_COMMIT
           gclient sync --with_branch_heads --with_tags --nohooks -D
@@ -135,7 +135,7 @@ jobs:
             "  pdf_use_skia_override = false" + [char]10 +
             '  pdf_skia_font_manager_target_override = ""' + [char]10 +
             "  pdf_enable_fontations_override = false" + [char]10 +
-            "  pdf_enable_rust_png_override = false" + [char]10 +
+            "  pdf_enable_rust_png_override = true" + [char]10 +
             "  pdf_bundle_freetype_override = false" + [char]10 +
             "}"
           ), [System.Text.UTF8Encoding]::new($false))
