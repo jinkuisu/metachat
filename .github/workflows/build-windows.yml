@@ -1,4 +1,4 @@
-name: Build MetaChat Browser (Windows)
+﻿name: Build MetaChat Browser (Windows) [self-hosted]
 
 on:
   workflow_dispatch:
@@ -12,116 +12,42 @@ env:
   CHROMIUM_COMMIT: ${{ github.event.inputs.chromium_commit || '150.0.7844.0' }}
   CHROMIUM_DIR: C:\chromium
   SRC_DIR: C:\chromium\src
-  # Use locally installed VS2022 instead of downloading a specific toolchain package
   DEPOT_TOOLS_WIN_TOOLCHAIN: "0"
 
 jobs:
   build:
-    runs-on: windows-2022
+    runs-on: [self-hosted, windows-2022]
     timeout-minutes: 480
 
     steps:
-      - name: Restore Chromium cache
-        id: cache-chromium
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ env.CHROMIUM_DIR }}
-          key: chromium-${{ env.CHROMIUM_COMMIT }}
-          restore-keys: |
-            chromium-150.0.
-            chromium-
       - uses: actions/checkout@v4
         with:
           path: metachat
 
-      - name: Setup depot_tools
+      - name: Reset and apply metachat-all.patch
         shell: pwsh
         run: |
-          git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git C:\depot_tools
-          echo "C:\depot_tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          # Bootstrap depot_tools (generate python3_bin_reldir.txt etc.)
-          # Required even on cache hit since gclient sync is skipped
-          C:\depot_tools\update_depot_tools.bat 2>&1 | Out-Null
-
-      - name: Setup VS2022
-        shell: pwsh
-        run: |
-          choco install visualstudio2022buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended" -y
-          choco install windows-sdk-10.0 -y
-
-      - name: Fetch Chromium source
-        if: steps.cache-chromium.outputs.cache-hit != 'true'
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path $env:CHROMIUM_DIR
-          cd $env:CHROMIUM_DIR
-          fetch --nohooks --no-history chromium
-          cd src
-          # Chromium 150.0.7844.0  (matched to ChromiumFish version)
-          git fetch origin tag $env:CHROMIUM_COMMIT --depth=1
-          git checkout $env:CHROMIUM_COMMIT
-          gclient sync --with_branch_heads --with_tags --nohooks -D
-      - name: Save Chromium cache
-        if: steps.cache-chromium.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ env.CHROMIUM_DIR }}
-          key: chromium-${{ env.CHROMIUM_COMMIT }}
-
-
-      - name: Download ChromiumFish font files (21 lean fonts)
-        shell: pwsh
-        run: |
-          $fontDir = "$env:SRC_DIR\third_party\lean_windows_fonts"
-          New-Item -ItemType Directory -Force -Path $fontDir
-          $baseUrl = "https://raw.githubusercontent.com/arman-bd/chromiumfish/v149.0.7827.115/assets/third_party/lean_windows_fonts"
-          $fonts = @(
-            "Arimo-VF-Italic.ttf", "Arimo-VF.ttf",
-            "Caladea-Bold.ttf", "Caladea-BoldItalic.ttf", "Caladea-Italic.ttf", "Caladea-Regular.ttf",
-            "Carlito-Bold.ttf", "Carlito-BoldItalic.ttf", "Carlito-Italic.ttf", "Carlito-Regular.ttf",
-            "ComicRelief-Bold.ttf", "ComicRelief-Regular.ttf",
-            "Cousine-Bold.ttf", "Cousine-BoldItalic.ttf", "Cousine-Italic.ttf", "Cousine-Regular.ttf",
-            "OpenSans-Regular.ttf",
-            "Tinos-Bold.ttf", "Tinos-BoldItalic.ttf", "Tinos-Italic.ttf", "Tinos-Regular.ttf"
-          )
-          foreach ($font in $fonts) {
-            $url = "$baseUrl/$font"
-            $outPath = "$fontDir\$font"
-            if (-not (Test-Path $outPath)) {
-              Write-Host "Downloading $font"
-              Invoke-WebRequest -Uri $url -OutFile $outPath -UseBasicParsing
-            }
-          }
-          Write-Host "Font files downloaded to $fontDir"
-          Get-ChildItem $fontDir | Select-Object Name, Length
-
-      - name: Apply metachat-all.patch
-        shell: pwsh
-        run: |
-          $metachat = "$env:GITHUB_WORKSPACE\metachat"
           cd $env:SRC_DIR
-          $patchFile = "$metachat\browser\patches\metachat-all.patch"
-          if (Test-Path $patchFile) {
-            Write-Host "Applying metachat-all.patch..."
-            git apply --reject --binary --whitespace=fix $patchFile 2>&1
-            if (-not $?) { exit 1 }
-            $rejCount = (Get-ChildItem -Recurse -Filter "*.rej" -Name).Count
-            if ($rejCount -gt 0) {
-              Write-Host "PATCH FAILED: $rejCount reject files" -ForegroundColor Red
-              Get-ChildItem -Recurse -Filter "*.rej" | Select-Object -ExpandProperty FullName
-              exit 1
-            }
-            Write-Host "Patch applied OK" -ForegroundColor Green
-          } else {
-            Write-Host "ERROR: metachat-all.patch not found" -ForegroundColor Red
+          # Reset Chromium source to pristine state, then apply patch
+          git checkout -f HEAD
+          # Skip git clean -fd (would delete fonts in third_party/lean_windows_fonts)
+          $patchFile = "$env:GITHUB_WORKSPACE\metachat\browser\patches\metachat-all.patch"
+          Write-Host "Applying metachat-all.patch..."
+          git apply --reject --binary --whitespace=fix $patchFile 2>&1
+          if (-not $?) { exit 1 }
+          $rejCount = (Get-ChildItem -Recurse -Filter "*.rej" -Name).Count
+          if ($rejCount -gt 0) {
+            Write-Host "PATCH FAILED: $rejCount reject files" -ForegroundColor Red
+            Get-ChildItem -Recurse -Filter "*.rej" | Select-Object -ExpandProperty FullName
             exit 1
           }
+          Write-Host "Patch applied OK" -ForegroundColor Green
+
       - name: Overlay assets
         shell: pwsh
         run: |
           $src = "$env:GITHUB_WORKSPACE\metachat\browser\assets"
           if (Test-Path $src) { robocopy $src "$env:SRC_DIR" /E /NJH /NJS /NP; if ($LASTEXITCODE -ge 8) { exit 1 } }; exit 0
-
 
       - name: Build overrides
         shell: pwsh
@@ -140,36 +66,26 @@ jobs:
             "}"
           ), [System.Text.UTF8Encoding]::new($false))
 
-      - name: Download toolchains
+      - name: Download toolchains (if missing)
         shell: pwsh
         run: |
           cd $env:SRC_DIR
-          # Create clang stamp file directly from DEPS.
-          # Clang binaries are already downloaded by gclient sync (GCS dep).
-          # Do NOT call update.py - it fails on GHA pwsh due to non-zero exit code.
           $stampPath = "third_party/llvm-build/Release+Asserts/cr_build_revision"
           if (-not (Test-Path $stampPath)) {
             $deps = Get-Content DEPS -Raw
             if ($deps -match 'Win/clang-([a-z0-9-]+)\.tar\.xz') {
               $rev = $matches[1]
             } else {
-              # Hardcoded fallback if DEPS format changes
               $rev = "llvmorg-23-init-10931-g20b6ec66-11"
             }
             New-Item -ItemType Directory -Force -Path (Split-Path $stampPath)
             Set-Content -Path $stampPath -Value "$rev" -NoNewline
-            Write-Host "Created clang stamp file: $rev" -ForegroundColor Green
           }
           if (-not (Test-Path "third_party/rust-toolchain/VERSION")) {
             python3 tools\rust\update_rust.py
           }
-      - name: Run gclient hooks (Node.js + npm deps)
-        shell: pwsh
-        run: |
-          cd $env:CHROMIUM_DIR
-          gclient runhooks
 
-      - name: Generate LASTCHANGE (required for build timestamp)
+      - name: Generate LASTCHANGE
         shell: pwsh
         run: |
           cd $env:SRC_DIR
@@ -230,5 +146,4 @@ jobs:
         with:
           name: metachat-browser-windows
           path: metachat-browser-windows.zip
-
 
