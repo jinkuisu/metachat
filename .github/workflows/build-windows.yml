@@ -13,6 +13,8 @@ env:
   CHROMIUM_DIR: C:\chromium
   SRC_DIR: C:\chromium\src
   DEPOT_TOOLS_WIN_TOOLCHAIN: "0"
+  vs2022_install: 'C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools'
+  GYP_MSVS_VERSION: "2022"
 
 jobs:
   build:
@@ -30,7 +32,8 @@ jobs:
           cd $env:SRC_DIR
           # Reset Chromium source to pristine state, then apply patch
           git checkout -f HEAD
-          # Skip git clean -fd (would delete fonts in third_party/lean_windows_fonts)
+          # Clean untracked files from previous runs (keep fonts)
+          git clean -fd --exclude=third_party/lean_windows_fonts/
           $patchFile = "$env:GITHUB_WORKSPACE\metachat\browser\patches\metachat-all.patch"
           Write-Host "Applying metachat-all.patch..."
           git apply --reject --binary --whitespace=fix $patchFile 2>&1
