@@ -64,6 +64,7 @@ index 4e6024318432d..b1ee252411521 100644
  #include "content/browser/devtools/devtools_agent_host_impl.h"
  #include "content/browser/devtools/devtools_manager.h"
  #include "content/browser/devtools/protocol/devtools_download_manager_delegate.h"
++#define _USE_MATH_DEFINES 1
 +#include "base/rand_util.h"
 +#include "base/timer/timer.h"
 +#include "components/input/render_widget_host_input_event_router.h"

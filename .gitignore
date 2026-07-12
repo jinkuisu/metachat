@@ -41,3 +41,5 @@ venv/
 *.pak
 *.zip
 *.tar.gz
+
+chromiumfish-src/
