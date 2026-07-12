@@ -12284,7 +12284,7 @@ index 0000000000000..8a6ece3d8467a
 +    const std::string block =
 +        base::StrCat({"\n==== step ", base::NumberToString(step_ + 1), " ",
 +                      label, " ====\n", text, "\n"});
-+    base::AppendToFile(base::FilePath(transcript_path_), block);
++    base::AppendToFile(base::FilePath::FromUTF8Unsafe(transcript_path_), block);
 +  }
 +}
 +
