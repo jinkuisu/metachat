@@ -115,9 +115,9 @@ index 2e1c77eaaca9a..790bba1e18873 100644
    renderer_cmd->CopySwitchesFrom(browser_cmd, kSwitchNames);
 +  // MetaChat: DVLOG - 记录已转发的指纹种子
 +  DVLOG(1) << "MetaChat: persona-seed="
-+           << browser_cmd->GetSwitchValueASCII(switches::kPersonaSeed)
++           << browser_cmd.GetSwitchValueASCII(switches::kPersonaSeed)
 +           << " persona-os="
-+           << browser_cmd->GetSwitchValueASCII("persona-os");
++           << browser_cmd.GetSwitchValueASCII("persona-os");
  
    // |switches::kGaiaConfig| can be set via browser command-line arguments,
    // usually by developers working on signin code. The switch, however, cannot
