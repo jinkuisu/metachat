@@ -9502,7 +9502,7 @@ new file mode 100644
 index 0000000000000..08cfcc4015447
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/event_log.cc
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,52 @@
 +// Copyright 2025 The MetaChat Authors.
 +#include "chrome/browser/ui/webui/metachat/event_log.h"
 +#include "base/files/file_util.h"
@@ -10068,7 +10068,7 @@ new file mode 100644
 index 0000000000000..53991c8d465c5
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/metachat_ui.cc
-@@ -0,0 +1,32 @@
+@@ -0,0 +1,33 @@
 +// Copyright 2025 The MetaChat Authors. All rights reserved.
 +
 +#include "chrome/browser/ui/webui/metachat/metachat_ui.h"
