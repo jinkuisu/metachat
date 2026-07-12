@@ -115,7 +115,7 @@ index 4e6024318432d..b1ee252411521 100644
 +  }
 +  const double u1 = std::max(1e-9, base::RandDouble());
 +  const double u2 = base::RandDouble();
-+  const double z = std::sqrt(-2.0 * std::log(u1)) * std::cos(2.0 * M_PI * u2);
++  const double z = std::sqrt(-2.0 * std::log(u1)) * std::cos(2.0 * 3.14159265358979323846 * u2);
 +  return std::clamp(z * sigma, -clamp_abs, clamp_abs);
 +}
 +
@@ -841,7 +841,7 @@ index 9364acb5ca137..f9f104f2de9b9 100644
 +  if (sigma <= 0) return 0.0;
 +  const double u1 = std::max(1e-9, base::RandDouble());
 +  const double u2 = base::RandDouble();
-+  const double z = std::sqrt(-2.0 * std::log(u1)) * std::cos(2.0 * M_PI * u2);
++  const double z = std::sqrt(-2.0 * std::log(u1)) * std::cos(2.0 * 3.14159265358979323846 * u2);
 +  return std::clamp(z * sigma, -clamp_abs, clamp_abs);
 +}
 +
