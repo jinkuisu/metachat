@@ -2431,6 +2431,7 @@ index 0290339053788..6e029726c5f32 100644
      "//base",
      "//base:i18n",
 +    "//chrome/browser/ai_agent",
++    "//chrome/browser/ui/webui/metachat",
      "//base/allocator:buildflags",
      "//build:android_buildflags",
      "//build:branding_buildflags",
