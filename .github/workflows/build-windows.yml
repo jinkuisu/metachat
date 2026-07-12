@@ -15,7 +15,7 @@ env:
   DEPOT_TOOLS_WIN_TOOLCHAIN: "0"
   vs2022_install: 'C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools'
   GYP_MSVS_VERSION: "2022"
-  SISO_JOBS: 8
+  SISO_JOBS: 4
 
 jobs:
   build:
