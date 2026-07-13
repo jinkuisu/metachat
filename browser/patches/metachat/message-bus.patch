@@ -80,7 +80,7 @@ new file mode 100644
 index 0000000000000..44a8cbc9a26fa
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/account_store.h
-@@ -0,0 +1,25 @@
+@@ -0,0 +1,26 @@
 +// Copyright 2025 The MetaChat Authors.
 +#ifndef CHROME_BROWSER_UI_WEBUI_METACHAT_ACCOUNT_STORE_H_
 +#define CHROME_BROWSER_UI_WEBUI_METACHAT_ACCOUNT_STORE_H_
@@ -88,6 +88,7 @@ index 0000000000000..44a8cbc9a26fa
 +#include <vector>
 +#include "base/files/file_path.h"
 +#include "base/values.h"
++#include "base/memory/raw_ptr.h"
 +#include "chrome/browser/ui/webui/metachat/data_model.h"
 +class Profile;
 +namespace metachat {
@@ -102,7 +103,7 @@ index 0000000000000..44a8cbc9a26fa
 +  bool SaveAll(const std::vector<Account>& accounts);
 +  base::FilePath GetPath() const;
 + private:
-+  Profile* profile_;
++  raw_ptr<Profile> profile_;
 +};
 +}  // namespace metachat
 +#endif
@@ -187,7 +188,7 @@ index 0000000000000..05186982fff5c
 +  int port() const { return port_; }
 + private:
 +  int port_ = -1;
-+  content::WebContents* attached_web_contents_ = nullptr;
++  raw_ptr<content::WebContents> attached_web_contents_ = nullptr;
 +};
 +}  // namespace metachat
 +#endif
@@ -586,7 +587,7 @@ new file mode 100644
 index 0000000000000..5429b0264df5f
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/message_bus.cc
-@@ -0,0 +1,400 @@
+@@ -0,0 +1,403 @@
 +// MetaChat: Message bus - WebUI <-> C++ bidirectional communication
 +// Copyright 2025 The MetaChat Authors. All rights reserved.
 +
@@ -595,6 +596,8 @@ index 0000000000000..5429b0264df5f
 +#include <utility>
 +
 +#include "base/json/json_writer.h"
++#include "base/files/file_util.h"
++#include "base/json/json_reader.h"
 +#include "base/logging.h"
 +#include "base/strings/string_number_conversions.h"
 +#include "base/time/time.h"
@@ -695,7 +698,8 @@ index 0000000000000..5429b0264df5f
 +  log_entry.category = "dispatch";
 +  log_entry.event = *channel + "." + *action;
 +  log_entry.level = "info";
-+  log_entry.trace_id = meta ? meta->FindString("traceId").value_or("") : "";
++  const std::string* trace_id = meta ? meta->FindString("traceId") : nullptr;
++  log_entry.trace_id = trace_id ? *trace_id : "";
 +  event_logger_->Log(log_entry);
 +
 +  if (*channel == "accounts")
@@ -992,7 +996,7 @@ new file mode 100644
 index 0000000000000..5da8193e5114f
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/message_bus.h
-@@ -0,0 +1,69 @@
+@@ -0,0 +1,70 @@
 +// Copyright 2025 The MetaChat Authors. All rights reserved.
 +
 +#ifndef CHROME_BROWSER_UI_WEBUI_METACHAT_MESSAGE_BUS_H_
@@ -1002,6 +1006,7 @@ index 0000000000000..5da8193e5114f
 +#include <string>
 +
 +#include "base/values.h"
++#include "base/memory/raw_ptr.h"
 +#include "content/public/browser/web_ui_message_handler.h"
 +
 +class Profile;
@@ -1058,7 +1063,7 @@ index 0000000000000..5da8193e5114f
 +  std::unique_ptr<metachat::AccountStore> account_store_;
 +  std::unique_ptr<metachat::WindowManager> window_manager_;
 +  std::unique_ptr<metachat::EventLogger> event_logger_;
-+  Profile* profile_ = nullptr;
++  raw_ptr<Profile> profile_ = nullptr;
 +};
 +
 +#endif  // CHROME_BROWSER_UI_WEBUI_METACHAT_MESSAGE_BUS_H_
@@ -1237,11 +1242,11 @@ index 0000000000000..e40d78700377e
 +  void Focus(const std::string& account_id);
 + private:
 +  struct WindowEntry {
-+    Browser* browser = nullptr;
-+    content::WebContents* web_contents = nullptr;
++    raw_ptr<Browser> browser = nullptr;
++    raw_ptr<content::WebContents> web_contents = nullptr;
 +  };
 +  std::unordered_map<std::string, WindowEntry> windows_;
-+  Profile* host_profile_ = nullptr;
++  raw_ptr<Profile> host_profile_ = nullptr;
 +};
 +}  // namespace metachat
 +#endif
