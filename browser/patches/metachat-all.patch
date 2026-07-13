@@ -9502,13 +9502,14 @@ new file mode 100644
 index 0000000000000..08cfcc4015447
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/event_log.cc
-@@ -0,0 +1,52 @@
+@@ -0,0 +1,53 @@
 +// Copyright 2025 The MetaChat Authors.
 +#include "chrome/browser/ui/webui/metachat/event_log.h"
 +#include "base/files/file_util.h"
 +#include "base/json/json_reader.h"
 +#include "base/json/json_writer.h"
 +#include "base/logging.h"
++#include "base/strings/stringprintf.h"
 +#include "base/time/time.h"
 +namespace metachat {
 +EventLogger::EventLogger(const base::FilePath& log_dir) : log_dir_(log_dir) {
