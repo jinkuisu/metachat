@@ -10139,14 +10139,15 @@ new file mode 100644
 index 0000000000000..7f965c99e73ec
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/window_manager.cc
-@@ -0,0 +1,66 @@
+@@ -0,0 +1,67 @@
 +// Copyright 2025 The MetaChat Authors.
 +#include "chrome/browser/ui/webui/metachat/window_manager.h"
 +#include "base/logging.h"
 +#include "chrome/browser/ui/browser.h"
 +#include "chrome/browser/ui/browser_commands.h"
-+#include "chrome/browser/ui/browser_navigator.h"
-+#include "chrome/browser/ui/browser_navigator_params.h"
+-#include "chrome/browser/ui/browser_navigator.h"
++#include "chrome/browser/ui/navigator/browser_navigator.h"
++#include "chrome/browser/ui/navigator/browser_navigator_params.h"
 +#include "chrome/browser/ui/browser_window.h"
 +#include "content/public/browser/web_contents.h"
 +namespace metachat {
