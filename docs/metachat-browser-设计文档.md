@@ -381,7 +381,8 @@ interface MessageResponse {
     channel: string;
     action: string;
     payload?: any;
-    requestId: string;
+    requestId: string;
+
     error?: string;
     meta?: {
         timestamp: number;
@@ -411,7 +412,8 @@ interface MessageEvent {
 
 | channel | 方向 | 说明 | 主要 actions |
 |---------|------|------|-------------|
-| ccounts | 双向 | 账号管理 | list create emove update switch |
+| ccounts | 双向 | 账号管理 | list create 
+emove update switch |
 | webs | 双向 | WebContents 管理 | create switch destroy set-visibility notify |
 | ingerprint | 双向 | 指纹管理 | set-seed get-profile |
 | cdp | 双向 | CDP 代理 | evaluate subscribe unsubscribe call-function |
@@ -433,7 +435,8 @@ class MessageBus {
 
     // 发送请求并等待响应
     send(channel, action, payload = {}, meta = {}) {
-        const requestId = eq_;
+        const requestId = 
+eq_;
         chrome.send('message', [{
             channel, action, payload, requestId,
             meta: { timestamp: Date.now(), ...meta }
@@ -505,12 +508,12 @@ window.MessageBus = new MessageBus();
 class MetaChatMessageBus : public content::WebUIMessageHandler {
  public:
   void RegisterMessages() override;
-  void DispatchEvent(const std::string& channel,
+  void DispatchEvent(base::ValueDict& channel,
                      const std::string& event,
                      base::Value payload,
                      base::Value::Dict meta = {});
  private:
-  void HandleDispatch(const base::Value::List& args);
+  void HandleDispatch(const base::ValueList& args);
   std::unique_ptr<AccountsHandler> accounts_handler_;
   std::unique_ptr<WebContentsHandler> web_contents_handler_;
   std::unique_ptr<CdpBridge> cdp_bridge_;
@@ -520,10 +523,10 @@ class MetaChatMessageBus : public content::WebUIMessageHandler {
 
 `cpp
 // 路由逻辑
-void MetaChatMessageBus::HandleDispatch(const base::Value::List& args) {
+void MetaChatMessageBus::HandleDispatch(const base::ValueList& args) {
     const auto& msg = args[0].GetDict();
     const std::string& channel = *msg.FindString("channel");
-    const std::string& action = *msg.FindString("action");
+    const base::ValueDicton = *msg.FindString("action");
     const base::Value* payload = msg.Find("payload");
     const std::string* request_id = msg.FindString("requestId");
     const base::Value::Dict* meta = msg.FindDict("meta");

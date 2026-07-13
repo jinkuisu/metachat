@@ -45,12 +45,12 @@ index 0000000000000..ec342ac4bb9f3
 +
 +namespace {
 +
-+base::Value::Dict MakeResponse(const std::string& channel,
++base::ValueDict MakeResponse(const std::string& channel,
 +                               const std::string& action_or_event,
-+                               base::Value::Dict payload,
++                               base::ValueDict payload,
 +                               const std::string& request_id,
 +                               bool is_event) {
-+  base::Value::Dict resp;
++  base::ValueDict resp;
 +  resp.Set("channel", channel);
 +  if (is_event) {
 +    resp.Set("event", action_or_event);
@@ -66,7 +66,7 @@ index 0000000000000..ec342ac4bb9f3
 +  return resp;
 +}
 +
-+void LogMetaIfPresent(const base::Value::Dict* meta,
++void LogMetaIfPresent(const base::ValueDict* meta,
 +                      const std::string& channel,
 +                      const std::string& action,
 +                      const std::string& request_id) {
@@ -95,7 +95,7 @@ index 0000000000000..ec342ac4bb9f3
 +                          base::Unretained(this)));
 +}
 +
-+void MetaChatMessageBus::HandleDispatch(const base::Value::List& args) {
++void MetaChatMessageBus::HandleDispatch(const base::ValueList& args) {
 +  TRACE_EVENT0("metachat", "MetaChatMessageBus::HandleDispatch");
 +  if (args.size() < 4) {
 +    LOG(WARNING) << "MetaChatMessageBus: too few args (" << args.size() << ")";
@@ -103,9 +103,9 @@ index 0000000000000..ec342ac4bb9f3
 +  }
 +  const std::string* channel = args[0].GetIfString();
 +  const std::string* action = args[1].GetIfString();
-+  const base::Value::Dict* payload = args[2].GetIfDict();
++  const base::ValueDict* payload = args[2].GetIfDict();
 +  const std::string* request_id = args[3].GetIfString();
-+  const base::Value::Dict* meta = nullptr;
++  const base::ValueDict* meta = nullptr;
 +  if (args.size() >= 5) meta = args[4].GetIfDict();
 +  if (!channel || !action || !request_id) {
 +    LOG(WARNING) << "MetaChatMessageBus: invalid dispatch args";
@@ -132,7 +132,7 @@ index 0000000000000..ec342ac4bb9f3
 +
 +void MetaChatMessageBus::SendResponse(const std::string& channel,
 +                                      const std::string& action,
-+                                      base::Value::Dict payload,
++                                      base::ValueDict payload,
 +                                      const std::string& request_id) {
 +  std::string json;
 +  base::JSONWriter::Write(
@@ -144,7 +144,7 @@ index 0000000000000..ec342ac4bb9f3
 +
 +void MetaChatMessageBus::SendEvent(const std::string& channel,
 +                                   const std::string& event_name,
-+                                   base::Value::Dict payload) {
++                                   base::ValueDict payload) {
 +  std::string json;
 +  base::JSONWriter::Write(
 +      MakeResponse(channel, event_name, std::move(payload), "", true),
@@ -153,20 +153,20 @@ index 0000000000000..ec342ac4bb9f3
 +                                         base::Value(json));
 +}
 +
-+base::Value::Dict MetaChatMessageBus::MakeError(
++base::ValueDict MetaChatMessageBus::MakeError(
 +    const std::string& code, const std::string& message) {
-+  base::Value::Dict err;
++  base::ValueDict err;
 +  err.Set("error", code);
 +  err.Set("message", message);
 +  return err;
 +}
 +
 +void MetaChatMessageBus::HandleAccounts(
-+    const std::string& action, const base::Value::Dict* payload,
++    const std::string& action, const base::ValueDict* payload,
 +    const std::string& request_id) {
 +  if (action == "list") {
-+    base::Value::Dict result;
-+    result.Set("accounts", base::Value::List());
++    base::ValueDict result;
++    result.Set("accounts", base::ValueList());
 +    SendResponse("accounts", action, std::move(result), request_id);
 +  } else {
 +    SendResponse("accounts", action,
@@ -176,7 +176,7 @@ index 0000000000000..ec342ac4bb9f3
 +}
 +
 +void MetaChatMessageBus::HandleWebs(
-+    const std::string& action, const base::Value::Dict* payload,
++    const std::string& action, const base::ValueDict* payload,
 +    const std::string& request_id) {
 +  SendResponse("webs", action,
 +      MakeError("not_implemented", "webs: " + action + " not implemented"),
@@ -184,7 +184,7 @@ index 0000000000000..ec342ac4bb9f3
 +}
 +
 +void MetaChatMessageBus::HandleCdp(
-+    const std::string& action, const base::Value::Dict* payload,
++    const std::string& action, const base::ValueDict* payload,
 +    const std::string& request_id) {
 +  SendResponse("cdp", action,
 +      MakeError("not_implemented", "cdp: " + action + " not implemented"),
@@ -192,7 +192,7 @@ index 0000000000000..ec342ac4bb9f3
 +}
 +
 +void MetaChatMessageBus::HandleConfig(
-+    const std::string& action, const base::Value::Dict* payload,
++    const std::string& action, const base::ValueDict* payload,
 +    const std::string& request_id) {
 +  SendResponse("config", action,
 +      MakeError("not_implemented", "config: " + action + " not implemented"),
@@ -200,7 +200,7 @@ index 0000000000000..ec342ac4bb9f3
 +}
 +
 +void MetaChatMessageBus::HandleNotification(
-+    const std::string& action, const base::Value::Dict* payload,
++    const std::string& action, const base::ValueDict* payload,
 +    const std::string& request_id) {
 +  SendResponse("notification", action,
 +      MakeError("not_implemented",
@@ -237,30 +237,30 @@ index 0000000000000..f0741b14a7b13
 +  void RegisterMessages() override;
 +  void SendEvent(const std::string& channel,
 +                 const std::string& event_name,
-+                 base::Value::Dict payload);
++                 base::ValueDict payload);
 +
 + private:
-+  void HandleDispatch(const base::Value::List& args);
++  void HandleDispatch(const base::ValueList& args);
 +  void SendResponse(const std::string& channel,
 +                    const std::string& action,
-+                    base::Value::Dict payload,
++                    base::ValueDict payload,
 +                    const std::string& request_id);
-+  base::Value::Dict MakeError(const std::string& code,
++  base::ValueDict MakeError(const std::string& code,
 +                              const std::string& message);
 +  void HandleAccounts(const std::string& action,
-+                      const base::Value::Dict* payload,
++                      const base::ValueDict* payload,
 +                      const std::string& request_id);
 +  void HandleWebs(const std::string& action,
-+                  const base::Value::Dict* payload,
++                  const base::ValueDict* payload,
 +                  const std::string& request_id);
 +  void HandleCdp(const std::string& action,
-+                 const base::Value::Dict* payload,
++                 const base::ValueDict* payload,
 +                 const std::string& request_id);
 +  void HandleConfig(const std::string& action,
-+                    const base::Value::Dict* payload,
++                    const base::ValueDict* payload,
 +                    const std::string& request_id);
 +  void HandleNotification(const std::string& action,
-+                          const base::Value::Dict* payload,
++                          const base::ValueDict* payload,
 +                          const std::string& request_id);
 +  raw_ptr<Profile> profile_ = nullptr;
 +};
