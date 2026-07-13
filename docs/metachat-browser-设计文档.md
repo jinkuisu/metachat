@@ -508,12 +508,12 @@ window.MessageBus = new MessageBus();
 class MetaChatMessageBus : public content::WebUIMessageHandler {
  public:
   void RegisterMessages() override;
-  void DispatchEvent(base::ValueDict& channel,
+  void DispatchEvent(base::DictValue& channel,
                      const std::string& event,
                      base::Value payload,
                      base::Value::Dict meta = {});
  private:
-  void HandleDispatch(const base::ValueList& args);
+  void HandleDispatch(const base::ListValue& args);
   std::unique_ptr<AccountsHandler> accounts_handler_;
   std::unique_ptr<WebContentsHandler> web_contents_handler_;
   std::unique_ptr<CdpBridge> cdp_bridge_;
@@ -523,10 +523,10 @@ class MetaChatMessageBus : public content::WebUIMessageHandler {
 
 `cpp
 // 路由逻辑
-void MetaChatMessageBus::HandleDispatch(const base::ValueList& args) {
+void MetaChatMessageBus::HandleDispatch(const base::ListValue& args) {
     const auto& msg = args[0].GetDict();
     const std::string& channel = *msg.FindString("channel");
-    const base::ValueDicton = *msg.FindString("action");
+    const base::DictValueon = *msg.FindString("action");
     const base::Value* payload = msg.Find("payload");
     const std::string* request_id = msg.FindString("requestId");
     const base::Value::Dict* meta = msg.FindDict("meta");

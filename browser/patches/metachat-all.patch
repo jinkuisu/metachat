@@ -9062,7 +9062,7 @@ index 0000000000000..1970d97fc58c9
 +}
 +bool AccountStore::SaveToFile(const base::FilePath& path, const std::vector<Account>& accounts) {
 +  base::CreateDirectory(path.DirName());
-+  base::ValueList list = AccountListToValue(accounts);
++  base::ListValue list = AccountListToValue(accounts);
 +  std::string json;
 +  base::JSONWriter::WriteWithOptions(list, base::JSONWriter::OPTIONS_PRETTY_PRINT, &json);
 +  if (!base::WriteFile(path, json)) {
@@ -9136,22 +9136,22 @@ index 0000000000000..e0b0062d59042
 +  attached_web_contents_ = nullptr;
 +  port_ = -1;
 +}
-+base::ValueDict CdpBridge::SendCommand(const std::string& method,
-+                                          base::ValueDict params) {
++base::DictValue CdpBridge::SendCommand(const std::string& method,
++                                          base::DictValue params) {
 +  if (!attached_web_contents_) {
-+    base::ValueDict err;
++    base::DictValue err;
 +    err.Set("error", "not_attached");
 +    return err;
 +  }
 +  auto host = content::DevToolsAgentHost::GetOrCreateFor(attached_web_contents_);
 +  if (!host) {
-+    base::ValueDict err;
++    base::DictValue err;
 +    err.Set("error", "no_agent_host");
 +    return err;
 +  }
 +  // DevToolsAgentHost::SendProtocolCommand dispatches to the page.
 +  host->SendProtocolCommand(method, /*message_id=*/std::nullopt, std::move(params));
-+  base::ValueDict ok;
++  base::DictValue ok;
 +  ok.Set("status", "sent");
 +  return ok;
 +}
@@ -9181,8 +9181,8 @@ index 0000000000000..05186982fff5c
 +  // Detach from current WebContents.
 +  void Detach();
 +  // Send a CDP command. Returns result dict or error dict.
-+  base::ValueDict SendCommand(const std::string& method,
-+                                base::ValueDict params);
++  base::DictValue SendCommand(const std::string& method,
++                                base::DictValue params);
 +  bool IsAttached() const { return port_ > 0; }
 +  int port() const { return port_; }
 + private:
@@ -9206,8 +9206,8 @@ index 0000000000000..0332b19113ae3
 +#include "base/time/time.h"
 +namespace metachat {
 +// --- FingerprintConfig ---
-+base::ValueDict FingerprintConfig::ToDict() const {
-+  base::ValueDict d;
++base::DictValue FingerprintConfig::ToDict() const {
++  base::DictValue d;
 +  if (!platform.empty()) d.Set("platform", platform);
 +  if (!user_agent.empty()) d.Set("user_agent", user_agent);
 +  if (!locale.empty()) d.Set("locale", locale);
@@ -9227,7 +9227,7 @@ index 0000000000000..0332b19113ae3
 +  d.Set("webrtc_leak_shield_enabled", webrtc_leak_shield_enabled);
 +  return d;
 +}
-+FingerprintConfig FingerprintConfig::FromDict(const base::ValueDict& d) {
++FingerprintConfig FingerprintConfig::FromDict(const base::DictValue& d) {
 +  FingerprintConfig c;
 +  if (auto* v = d.FindString("platform")) c.platform = *v;
 +  if (auto* v = d.FindString("user_agent")) c.user_agent = *v;
@@ -9249,8 +9249,8 @@ index 0000000000000..0332b19113ae3
 +  return c;
 +}
 +// --- ProxyConfig ---
-+base::ValueDict ProxyConfig::ToDict() const {
-+  base::ValueDict d;
++base::DictValue ProxyConfig::ToDict() const {
++  base::DictValue d;
 +  if (!mode.empty()) d.Set("mode", mode);
 +  if (!host.empty()) d.Set("host", host);
 +  if (port > 0) d.Set("port", port);
@@ -9258,7 +9258,7 @@ index 0000000000000..0332b19113ae3
 +  if (!password.empty()) d.Set("password", password);
 +  return d;
 +}
-+ProxyConfig ProxyConfig::FromDict(const base::ValueDict& d) {
++ProxyConfig ProxyConfig::FromDict(const base::DictValue& d) {
 +  ProxyConfig c;
 +  if (auto* v = d.FindString("mode")) c.mode = *v;
 +  if (auto* v = d.FindString("host")) c.host = *v;
@@ -9268,8 +9268,8 @@ index 0000000000000..0332b19113ae3
 +  return c;
 +}
 +// --- Account ---
-+base::ValueDict Account::ToDict() const {
-+  base::ValueDict d;
++base::DictValue Account::ToDict() const {
++  base::DictValue d;
 +  d.Set("id", id); d.Set("type", type); d.Set("name", name);
 +  if (!notes.empty()) d.Set("notes", notes);
 +  d.Set("created_at", static_cast<double>(created_at));
@@ -9281,7 +9281,7 @@ index 0000000000000..0332b19113ae3
 +  d.Set("proxy", proxy.ToDict());
 +  return d;
 +}
-+Account Account::FromDict(const base::ValueDict& d) {
++Account Account::FromDict(const base::DictValue& d) {
 +  Account a;
 +  if (auto* v = d.FindString("id")) a.id = *v;
 +  if (auto* v = d.FindString("type")) a.type = *v;
@@ -9297,8 +9297,8 @@ index 0000000000000..0332b19113ae3
 +  return a;
 +}
 +// --- RuntimeState ---
-+base::ValueDict RuntimeState::ToDict() const {
-+  base::ValueDict d;
++base::DictValue RuntimeState::ToDict() const {
++  base::DictValue d;
 +  d.Set("account_id", account_id); d.Set("status", status);
 +  if (!error_message.empty()) d.Set("error_message", error_message);
 +  d.Set("unread_count", unread_count);
@@ -9309,7 +9309,7 @@ index 0000000000000..0332b19113ae3
 +  d.Set("cdp_port", cdp_port); d.Set("pid", pid);
 +  return d;
 +}
-+RuntimeState RuntimeState::FromDict(const base::ValueDict& d) {
++RuntimeState RuntimeState::FromDict(const base::DictValue& d) {
 +  RuntimeState s;
 +  if (auto* v = d.FindString("account_id")) s.account_id = *v;
 +  if (auto* v = d.FindString("status")) s.status = *v;
@@ -9324,8 +9324,8 @@ index 0000000000000..0332b19113ae3
 +  return s;
 +}
 +// --- EventLog ---
-+base::ValueDict EventLog::ToDict() const {
-+  base::ValueDict d;
++base::DictValue EventLog::ToDict() const {
++  base::DictValue d;
 +  d.Set("id", id); d.Set("timestamp", static_cast<double>(timestamp));
 +  d.Set("account_id", account_id); d.Set("category", category);
 +  d.Set("event", event); d.Set("level", level);
@@ -9333,7 +9333,7 @@ index 0000000000000..0332b19113ae3
 +  if (!trace_id.empty()) d.Set("trace_id", trace_id);
 +  return d;
 +}
-+EventLog EventLog::FromDict(const base::ValueDict& d) {
++EventLog EventLog::FromDict(const base::DictValue& d) {
 +  EventLog e;
 +  if (auto* v = d.FindString("id")) e.id = *v;
 +  e.timestamp = static_cast<int64_t>(d.FindDouble("timestamp").value_or(0));
@@ -9346,12 +9346,12 @@ index 0000000000000..0332b19113ae3
 +  return e;
 +}
 +// --- Helpers ---
-+base::ValueList AccountListToValue(const std::vector<Account>& accounts) {
-+  base::ValueList list;
++base::ListValue AccountListToValue(const std::vector<Account>& accounts) {
++  base::ListValue list;
 +  for (const auto& a : accounts) list.Append(a.ToDict());
 +  return list;
 +}
-+std::vector<Account> AccountListFromValue(const base::ValueList& list) {
++std::vector<Account> AccountListFromValue(const base::ListValue& list) {
 +  std::vector<Account> accounts;
 +  accounts.reserve(list.size());
 +  for (const auto& val : list) {
@@ -9408,8 +9408,8 @@ index 0000000000000..54409cc234127
 +  double audio_noise_level = 0.3;
 +  bool webrtc_leak_shield_enabled = true;
 +
-+  base::ValueDict ToDict() const;
-+  static FingerprintConfig FromDict(const base::ValueDict& dict);
++  base::DictValue ToDict() const;
++  static FingerprintConfig FromDict(const base::DictValue& dict);
 +};
 +
 +// --- ProxyConfig -------------------------------------------------------
@@ -9420,8 +9420,8 @@ index 0000000000000..54409cc234127
 +  std::string username;
 +  std::string password;
 +
-+  base::ValueDict ToDict() const;
-+  static ProxyConfig FromDict(const base::ValueDict& dict);
++  base::DictValue ToDict() const;
++  static ProxyConfig FromDict(const base::DictValue& dict);
 +};
 +
 +// --- Account -----------------------------------------------------------
@@ -9449,8 +9449,8 @@ index 0000000000000..54409cc234127
 +  int64_t last_active = 0;
 +  std::string status_text;
 +
-+  base::ValueDict ToDict() const;
-+  static Account FromDict(const base::ValueDict& dict);
++  base::DictValue ToDict() const;
++  static Account FromDict(const base::DictValue& dict);
 +};
 +
 +// --- RuntimeState ------------------------------------------------------
@@ -9466,8 +9466,8 @@ index 0000000000000..54409cc234127
 +  int cdp_port = 0;
 +  int pid = 0;
 +
-+  base::ValueDict ToDict() const;
-+  static RuntimeState FromDict(const base::ValueDict& dict);
++  base::DictValue ToDict() const;
++  static RuntimeState FromDict(const base::DictValue& dict);
 +};
 +
 +// --- EventLog ----------------------------------------------------------
@@ -9481,13 +9481,13 @@ index 0000000000000..54409cc234127
 +  std::string details;
 +  std::string trace_id;
 +
-+  base::ValueDict ToDict() const;
-+  static EventLog FromDict(const base::ValueDict& dict);
++  base::DictValue ToDict() const;
++  static EventLog FromDict(const base::DictValue& dict);
 +};
 +
 +// --- Helpers -----------------------------------------------------------
-+base::ValueList AccountListToValue(const std::vector<Account>& accounts);
-+std::vector<Account> AccountListFromValue(const base::ValueList& list);
++base::ListValue AccountListToValue(const std::vector<Account>& accounts);
++std::vector<Account> AccountListFromValue(const base::ListValue& list);
 +
 +std::string GenerateId();
 +uint64_t GenerateSeed();
@@ -9520,7 +9520,7 @@ index 0000000000000..08cfcc4015447
 +    events = Query(0, 0);
 +  }
 +  events.push_back(entry);
-+  base::ValueList list;
++  base::ListValue list;
 +  for (const auto& e : events) list.Append(e.ToDict());
 +  std::string json;
 +  base::JSONWriter::WriteWithOptions(list, base::JSONWriter::OPTIONS_PRETTY_PRINT, &json);
@@ -9608,12 +9608,12 @@ index 0000000000000..5429b0264df5f
 +
 +namespace {
 +
-+base::ValueDict MakeResponse(const std::string& channel,
++base::DictValue MakeResponse(const std::string& channel,
 +                               const std::string& action_or_event,
-+                               base::ValueDict payload,
++                               base::DictValue payload,
 +                               const std::string& request_id,
 +                               bool is_event) {
-+  base::ValueDict resp;
++  base::DictValue resp;
 +  resp.Set("channel", channel);
 +  if (is_event) {
 +    resp.Set("event", action_or_event);
@@ -9629,7 +9629,7 @@ index 0000000000000..5429b0264df5f
 +  return resp;
 +}
 +
-+void LogMetaIfPresent(const base::ValueDict* meta,
++void LogMetaIfPresent(const base::DictValue* meta,
 +                      const std::string& channel,
 +                      const std::string& action,
 +                      const std::string& request_id) {
@@ -9665,7 +9665,7 @@ index 0000000000000..5429b0264df5f
 +                          base::Unretained(this)));
 +}
 +
-+void MetaChatMessageBus::HandleDispatch(const base::ValueList& args) {
++void MetaChatMessageBus::HandleDispatch(const base::ListValue& args) {
 +  TRACE_EVENT0("metachat", "MetaChatMessageBus::HandleDispatch");
 +  if (args.size() < 4) {
 +    LOG(WARNING) << "MetaChatMessageBus: too few args (" << args.size() << ")";
@@ -9673,9 +9673,9 @@ index 0000000000000..5429b0264df5f
 +  }
 +  const std::string* channel = args[0].GetIfString();
 +  const std::string* action = args[1].GetIfString();
-+  const base::ValueDict* payload = args[2].GetIfDict();
++  const base::DictValue* payload = args[2].GetIfDict();
 +  const std::string* request_id = args[3].GetIfString();
-+  const base::ValueDict* meta = nullptr;
++  const base::DictValue* meta = nullptr;
 +  if (args.size() >= 5) meta = args[4].GetIfDict();
 +
 +  if (!channel || !action || !request_id) {
@@ -9717,7 +9717,7 @@ index 0000000000000..5429b0264df5f
 +
 +void MetaChatMessageBus::SendResponse(const std::string& channel,
 +                                      const std::string& action,
-+                                      base::ValueDict payload,
++                                      base::DictValue payload,
 +                                      const std::string& request_id) {
 +  std::string json;
 +  base::JSONWriter::Write(
@@ -9729,7 +9729,7 @@ index 0000000000000..5429b0264df5f
 +
 +void MetaChatMessageBus::SendEvent(const std::string& channel,
 +                                   const std::string& event_name,
-+                                   base::ValueDict payload) {
++                                   base::DictValue payload) {
 +  std::string json;
 +  base::JSONWriter::Write(
 +      MakeResponse(channel, event_name, std::move(payload), "", true),
@@ -9738,9 +9738,9 @@ index 0000000000000..5429b0264df5f
 +                                         base::Value(json));
 +}
 +
-+base::ValueDict MetaChatMessageBus::MakeError(
++base::DictValue MetaChatMessageBus::MakeError(
 +    const std::string& code, const std::string& message) {
-+  base::ValueDict err;
++  base::DictValue err;
 +  err.Set("_metachat_error_", code);
 +  err.Set("message", message);
 +  return err;
@@ -9749,11 +9749,11 @@ index 0000000000000..5429b0264df5f
 +// ─── Accounts ──────────────────────────────────────────────────────
 +
 +void MetaChatMessageBus::HandleAccounts(
-+    const std::string& action, const base::ValueDict* payload,
++    const std::string& action, const base::DictValue* payload,
 +    const std::string& request_id) {
 +  if (action == "list") {
 +    auto accounts = account_store_->LoadAll();
-+    base::ValueDict result;
++    base::DictValue result;
 +    result.Set("accounts", metachat::AccountListToValue(accounts));
 +    SendResponse("accounts", action, std::move(result), request_id);
 +  } else if (action == "create") {
@@ -9777,7 +9777,7 @@ index 0000000000000..5429b0264df5f
 +    }
 +    accounts.push_back(a);
 +    account_store_->SaveAll(accounts);
-+    base::ValueDict result;
++    base::DictValue result;
 +    result.Set("account", a.ToDict());
 +    SendResponse("accounts", action, std::move(result), request_id);
 +  } else if (action == "update") {
@@ -9803,7 +9803,7 @@ index 0000000000000..5429b0264df5f
 +      return;
 +    }
 +    account_store_->SaveAll(accounts);
-+    base::ValueDict result;
++    base::DictValue result;
 +    result.Set("account", a.ToDict());
 +    SendResponse("accounts", action, std::move(result), request_id);
 +  } else if (action == "delete") {
@@ -9819,7 +9819,7 @@ index 0000000000000..5429b0264df5f
 +    auto accounts = account_store_->LoadAll();
 +    std::erase_if(accounts, [&](const metachat::Account& a) { return a.id == *id; });
 +    account_store_->SaveAll(accounts);
-+    SendResponse("accounts", action, base::ValueDict(), request_id);
++    SendResponse("accounts", action, base::DictValue(), request_id);
 +  } else {
 +    SendResponse("accounts", action,
 +        MakeError("unknown_action", "accounts: " + action + " unknown"),
@@ -9830,7 +9830,7 @@ index 0000000000000..5429b0264df5f
 +// ─── Webs ─────────────────────────────────────────────────────────
 +
 +void MetaChatMessageBus::HandleWebs(
-+    const std::string& action, const base::ValueDict* payload,
++    const std::string& action, const base::DictValue* payload,
 +    const std::string& request_id) {
 +  if (action == "open" && payload) {
 +    const std::string* account_id = payload->FindString("account_id");
@@ -9840,7 +9840,7 @@ index 0000000000000..5429b0264df5f
 +      return;
 +    }
 +    window_manager_->OpenOrFocus(*account_id, GURL(*url_str));
-+    base::ValueDict result;
++    base::DictValue result;
 +    result.Set("status", "opened");
 +    result.Set("account_id", *account_id);
 +    SendResponse("webs", action, std::move(result), request_id);
@@ -9851,7 +9851,7 @@ index 0000000000000..5429b0264df5f
 +      return;
 +    }
 +    window_manager_->Close(*account_id);
-+    base::ValueDict result;
++    base::DictValue result;
 +    result.Set("status", "closed");
 +    SendResponse("webs", action, std::move(result), request_id);
 +  } else if (action == "hide" && payload) {
@@ -9861,7 +9861,7 @@ index 0000000000000..5429b0264df5f
 +      return;
 +    }
 +    window_manager_->Hide(*account_id);
-+    base::ValueDict result;
++    base::DictValue result;
 +    result.Set("status", "hidden");
 +    SendResponse("webs", action, std::move(result), request_id);
 +  } else if (action == "focus" && payload) {
@@ -9871,7 +9871,7 @@ index 0000000000000..5429b0264df5f
 +      return;
 +    }
 +    window_manager_->Focus(*account_id);
-+    base::ValueDict result;
++    base::DictValue result;
 +    result.Set("status", "focused");
 +    SendResponse("webs", action, std::move(result), request_id);
 +  } else {
@@ -9884,12 +9884,12 @@ index 0000000000000..5429b0264df5f
 +// ─── CDP ──────────────────────────────────────────────────────────
 +
 +void MetaChatMessageBus::HandleCdp(
-+    const std::string& action, const base::ValueDict* payload,
++    const std::string& action, const base::DictValue* payload,
 +    const std::string& request_id) {
 +  if (action == "send" && payload) {
 +    const std::string* account_id = payload->FindString("account_id");
 +    const std::string* method = payload->FindString("method");
-+    const base::ValueDict* params = payload->FindDict("params");
++    const base::DictValue* params = payload->FindDict("params");
 +    if (!account_id || !method) {
 +      SendResponse("cdp", action, MakeError("missing_fields", ""), request_id);
 +      return;
@@ -9901,8 +9901,8 @@ index 0000000000000..5429b0264df5f
 +    }
 +    metachat::CdpBridge bridge;
 +    bridge.Attach(wc);
-+    base::ValueDict result = bridge.SendCommand(
-+        *method, params ? params->Clone() : base::ValueDict());
++    base::DictValue result = bridge.SendCommand(
++        *method, params ? params->Clone() : base::DictValue());
 +    SendResponse("cdp", action, std::move(result), request_id);
 +  } else {
 +    SendResponse("cdp", action,
@@ -9914,7 +9914,7 @@ index 0000000000000..5429b0264df5f
 +// ─── Config ───────────────────────────────────────────────────────
 +
 +void MetaChatMessageBus::HandleConfig(
-+    const std::string& action, const base::ValueDict* payload,
++    const std::string& action, const base::DictValue* payload,
 +    const std::string& request_id) {
 +  base::FilePath config_path = profile_->GetPath()
 +      .Append(FILE_PATH_LITERAL("metachat"))
@@ -9922,18 +9922,18 @@ index 0000000000000..5429b0264df5f
 +
 +  if (action == "get") {
 +    std::string json;
-+    base::ValueDict config;
++    base::DictValue config;
 +    if (base::ReadFileToString(config_path, &json)) {
 +      auto parsed = base::JSONReader::Read(json, base::JSON_PARSE_RFC);
 +      if (parsed && parsed->is_dict()) {
 +        config = std::move(parsed->GetDict());
 +      }
 +    }
-+    base::ValueDict result;
++    base::DictValue result;
 +    result.Set("config", std::move(config));
 +    SendResponse("config", action, std::move(result), request_id);
 +  } else if (action == "set" && payload) {
-+    const base::ValueDict* config_dict = payload->FindDict("config");
++    const base::DictValue* config_dict = payload->FindDict("config");
 +    if (!config_dict) {
 +      SendResponse("config", action, MakeError("missing_config", ""), request_id);
 +      return;
@@ -9943,7 +9943,7 @@ index 0000000000000..5429b0264df5f
 +    base::JSONWriter::WriteWithOptions(
 +        *config_dict, base::JSONWriter::OPTIONS_PRETTY_PRINT, &json);
 +    base::WriteFile(config_path, json);
-+    SendResponse("config", action, base::ValueDict(), request_id);
++    SendResponse("config", action, base::DictValue(), request_id);
 +  } else {
 +    SendResponse("config", action,
 +        MakeError("unknown_action", "config: " + action + " unknown"),
@@ -9954,11 +9954,11 @@ index 0000000000000..5429b0264df5f
 +// ─── Notification ─────────────────────────────────────────────────
 +
 +void MetaChatMessageBus::HandleNotification(
-+    const std::string& action, const base::ValueDict* payload,
++    const std::string& action, const base::DictValue* payload,
 +    const std::string& request_id) {
 +  // Notifications are push (server -> client) via SendEvent.
 +  // For MVP, just acknowledge.
-+  base::ValueDict result;
++  base::DictValue result;
 +  result.Set("status", "ok");
 +  result.Set("note", "notification pushes configured server-side");
 +  SendResponse("notification", action, std::move(result), request_id);
@@ -9967,7 +9967,7 @@ index 0000000000000..5429b0264df5f
 +// ─── Events ───────────────────────────────────────────────────────
 +
 +void MetaChatMessageBus::HandleEvents(
-+    const std::string& action, const base::ValueDict* payload,
++    const std::string& action, const base::DictValue* payload,
 +    const std::string& request_id) {
 +  if (action == "query") {
 +    int64_t since = static_cast<int64_t>(
@@ -9975,9 +9975,9 @@ index 0000000000000..5429b0264df5f
 +    size_t limit = static_cast<size_t>(
 +        payload ? payload->FindInt("limit").value_or(0) : 0);
 +    auto entries = event_logger_->Query(since, limit);
-+    base::ValueList list;
++    base::ListValue list;
 +    for (const auto& e : entries) list.Append(e.ToDict());
-+    base::ValueDict result;
++    base::DictValue result;
 +    result.Set("events", std::move(list));
 +    SendResponse("events", action, std::move(result), request_id);
 +  } else {
@@ -10019,38 +10019,38 @@ index 0000000000000..5da8193e5114f
 +
 +  void SendEvent(const std::string& channel,
 +                 const std::string& event_name,
-+                 base::ValueDict payload);
++                 base::DictValue payload);
 +
 + private:
 +  // Dispatch entry point
-+  void HandleDispatch(const base::ValueList& args);
++  void HandleDispatch(const base::ListValue& args);
 +  void SendResponse(const std::string& channel,
 +                    const std::string& action,
-+                    base::ValueDict payload,
++                    base::DictValue payload,
 +                    const std::string& request_id);
 +
 +  // Error helper
-+  base::ValueDict MakeError(const std::string& code,
++  base::DictValue MakeError(const std::string& code,
 +                              const std::string& message);
 +
 +  // Channel handlers
 +  void HandleAccounts(const std::string& action,
-+                      const base::ValueDict* payload,
++                      const base::DictValue* payload,
 +                      const std::string& request_id);
 +  void HandleWebs(const std::string& action,
-+                  const base::ValueDict* payload,
++                  const base::DictValue* payload,
 +                  const std::string& request_id);
 +  void HandleCdp(const std::string& action,
-+                 const base::ValueDict* payload,
++                 const base::DictValue* payload,
 +                 const std::string& request_id);
 +  void HandleConfig(const std::string& action,
-+                    const base::ValueDict* payload,
++                    const base::DictValue* payload,
 +                    const std::string& request_id);
 +  void HandleNotification(const std::string& action,
-+                          const base::ValueDict* payload,
++                          const base::DictValue* payload,
 +                          const std::string& request_id);
 +  void HandleEvents(const std::string& action,
-+                    const base::ValueDict* payload,
++                    const base::DictValue* payload,
 +                    const std::string& request_id);
 +
 +  // Modules
