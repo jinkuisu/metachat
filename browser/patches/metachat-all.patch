@@ -9197,11 +9197,12 @@ new file mode 100644
 index 0000000000000..0332b19113ae3
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/data_model.cc
-@@ -0,0 +1,164 @@
+@@ -0,0 +1,165 @@
 +// ... (data_model.cc content)
 +#include "chrome/browser/ui/webui/metachat/data_model.h"
 +#include <string>
 +#include "base/rand_util.h"
++#include "base/uuid.h"
 +#include "base/strings/string_number_conversions.h"
 +#include "base/time/time.h"
 +namespace metachat {
@@ -9359,7 +9360,7 @@ index 0000000000000..0332b19113ae3
 +  }
 +  return accounts;
 +}
-+std::string GenerateId() { return base::GenerateGUID(); }
++std::string GenerateId() { return base::Uuid::GenerateRandomV4().AsLowercaseString(); }
 +uint64_t GenerateSeed() { return base::RandUint64(); }
 +}  // namespace metachat
 \ No newline at end of file
