@@ -9667,7 +9667,7 @@ index 0000000000000..5429b0264df5f
 +}
 +
 +void MetaChatMessageBus::HandleDispatch(const base::ListValue& args) {
-+  TRACE_EVENT0("metachat", "MetaChatMessageBus::HandleDispatch");
++  TRACE_EVENT0("browser", "MetaChatMessageBus::HandleDispatch");
 +  if (args.size() < 4) {
 +    LOG(WARNING) << "MetaChatMessageBus: too few args (" << args.size() << ")";
 +    return;
