@@ -1145,8 +1145,8 @@ index 0000000000000..7f965c99e73ec
 +#include "base/logging.h"
 +#include "chrome/browser/ui/browser.h"
 +#include "chrome/browser/ui/browser_commands.h"
-+#include "chrome/browser/ui/browser_navigator.h"
-+#include "chrome/browser/ui/browser_navigator_params.h"
++#include "chrome/browser/ui/navigator/browser_navigator.h"
++#include "chrome/browser/ui/navigator/browser_navigator_params.h"
 +#include "chrome/browser/ui/browser_window.h"
 +#include "content/public/browser/web_contents.h"
 +namespace metachat {
