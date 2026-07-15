@@ -1073,7 +1073,7 @@ new file mode 100644
 index 0000000000000..53991c8d465c5
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/metachat_ui.cc
-@@ -0,0 +1,33 @@
+@@ -0,0 +1,35 @@
 +// Copyright 2025 The MetaChat Authors. All rights reserved.
 +
 +#include "chrome/browser/ui/webui/metachat/metachat_ui.h"
@@ -1086,7 +1086,9 @@ index 0000000000000..53991c8d465c5
 +#include "content/public/browser/web_contents.h"
 +#include "content/public/browser/web_ui.h"
 +#include "content/public/browser/web_ui_data_source.h"
++#include "base/logging.h"
 +
++const char kChromeUIMetaChatHost[] = "metachat";
 +MetaChatUIConfig::MetaChatUIConfig()
 +    : WebUIConfig(content::kChromeUIScheme, chrome::kChromeUIMetaChatHost) {}
 +
