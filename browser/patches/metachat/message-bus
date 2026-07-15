@@ -341,7 +341,7 @@ index 0000000000000..b9c7b5acc3161
 +}  // namespace
 +
 +MetaChatUIConfig::MetaChatUIConfig()
-+    : WebUIConfig(content::kChromeUIScheme, chrome::kChromeUIMetaChatHost) {}
++    : WebUIConfig(content::kChromeUIScheme, kChromeUIMetaChatHost) {}
 +
 +std::unique_ptr<content::WebUIController>
 +MetaChatUIConfig::CreateWebUIController(content::WebUI* web_ui,
@@ -353,7 +353,7 @@ index 0000000000000..b9c7b5acc3161
 +    : WebUIController(web_ui) {
 +  Profile* profile = Profile::FromWebUI(web_ui);
 +  content::WebUIDataSource* source = content::WebUIDataSource::CreateAndAdd(
-+      profile, chrome::kChromeUIMetaChatHost);
++      profile, kChromeUIMetaChatHost);
 +
 +  // Serve placeholder HTML until the real UI is built.
 +  source->SetRequestFilter(

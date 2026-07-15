@@ -10090,7 +10090,7 @@ index 0000000000000..53991c8d465c5
 +
 +const char kChromeUIMetaChatHost[] = "metachat";
 +MetaChatUIConfig::MetaChatUIConfig()
-+    : WebUIConfig(content::kChromeUIScheme, chrome::kChromeUIMetaChatHost) {}
++    : WebUIConfig(content::kChromeUIScheme, kChromeUIMetaChatHost) {}
 +
 +std::unique_ptr<content::WebUIController>
 +MetaChatUIConfig::CreateWebUIController(content::WebUI* web_ui,
@@ -10102,7 +10102,7 @@ index 0000000000000..53991c8d465c5
 +    : WebUIController(web_ui) {
 +  Profile* profile = Profile::FromWebUI(web_ui);
 +  content::WebUIDataSource* source = content::WebUIDataSource::CreateAndAdd(
-+      profile, chrome::kChromeUIMetaChatHost);
++      profile, kChromeUIMetaChatHost);
 +  source->SetDefaultResource(100);
 +  DVLOG(1) << "MetaChat: UI created";
 +  web_ui->AddMessageHandler(std::make_unique<MetaChatMessageBus>());
