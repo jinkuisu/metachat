@@ -113,7 +113,7 @@ new file mode 100644
 index 0000000000000..e0b0062d59042
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/cdp_bridge.cc
-@@ -0,0 +1,58 @@
+@@ -0,0 +1,56 @@
 +// Copyright 2025 The MetaChat Authors.
 +#include "chrome/browser/ui/webui/metachat/cdp_bridge.h"
 +#include "base/logging.h"
