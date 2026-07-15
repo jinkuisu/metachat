@@ -113,49 +113,64 @@ new file mode 100644
 index 0000000000000..e0b0062d59042
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/cdp_bridge.cc
-@@ -0,0 +1,43 @@
+@@ -0,0 +1,58 @@
 +// Copyright 2025 The MetaChat Authors.
 +#include "chrome/browser/ui/webui/metachat/cdp_bridge.h"
 +#include "base/logging.h"
-+#include "base/json/json_reader.h"
 +#include "base/json/json_writer.h"
 +#include "base/strings/string_number_conversions.h"
 +#include "content/public/browser/devtools_agent_host.h"
 +#include "content/public/browser/web_contents.h"
 +namespace metachat {
 +CdpBridge::CdpBridge() = default;
++
 +int CdpBridge::Attach(content::WebContents* web_contents) {
-+  if (!web_contents) return -1;
-+  attached_web_contents_ = web_contents;
-+  // For MVP, we use an internal DevToolsAgentHost without starting a server.
-+  // This allows SendCommand to work without exposing a TCP port.
-+  port_ = 0;  // Attached internally
-+  DVLOG(1) << "CdpBridge: attached to WebContents";
-+  return port_;
++  if (!web_contents || attached_) return -1;
++  host_ = content::DevToolsAgentHost::GetOrCreateFor(web_contents);
++  if (!host_) return -1;
++  attached_ = host_->AttachClient(this);
++  return attached_ ? 0 : -1;
 +}
++
 +void CdpBridge::Detach() {
-+  attached_web_contents_ = nullptr;
-+  port_ = -1;
++  if (host_ && attached_) host_->DetachClient(this);
++  attached_ = false;
++  host_ = nullptr;
 +}
++
 +base::DictValue CdpBridge::SendCommand(const std::string& method,
 +                                          base::DictValue params) {
-+  if (!attached_web_contents_) {
++  if (!attached_ || !host_) {
 +    base::DictValue err;
 +    err.Set("error", "not_attached");
 +    return err;
 +  }
-+  auto host = content::DevToolsAgentHost::GetOrCreateFor(attached_web_contents_);
-+  if (!host) {
-+    base::DictValue err;
-+    err.Set("error", "no_agent_host");
-+    return err;
-+  }
-+  // DevToolsAgentHost::SendProtocolCommand dispatches to the page.
-+  host->SendProtocolCommand(method, /*message_id=*/std::nullopt, std::move(params));
++  base::DictValue command;
++  command.Set("id", next_id_++);
++  command.Set("method", method);
++  command.Set("params", std::move(params));
++  std::string json;
++  base::JSONWriter::Write(command, &json);
++  base::span<const uint8_t> msg(
++      reinterpret_cast<const uint8_t*>(json.data()), json.size());
++  host_->DispatchProtocolMessage(this, msg);
 +  base::DictValue ok;
 +  ok.Set("status", "sent");
 +  return ok;
 +}
++
++void CdpBridge::DispatchProtocolMessage(
++    content::DevToolsAgentHost* agent_host,
++    base::span<const uint8_t> message) {
++  DVLOG(1) << "CdpBridge: received " << message.size() << " bytes";
++}
++
++void CdpBridge::AgentHostClosed(
++    content::DevToolsAgentHost* agent_host) {
++  attached_ = false;
++  host_ = nullptr;
++}
++
 +}  // namespace metachat
 \ No newline at end of file
 diff --git a/chrome/browser/ui/webui/metachat/cdp_bridge.h b/chrome/browser/ui/webui/metachat/cdp_bridge.h
@@ -163,32 +178,31 @@ new file mode 100644
 index 0000000000000..05186982fff5c
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/cdp_bridge.h
-@@ -0,0 +1,28 @@
+@@ -0,0 +1,27 @@
 +// Copyright 2025 The MetaChat Authors.
 +#ifndef CHROME_BROWSER_UI_WEBUI_METACHAT_CDP_BRIDGE_H_
 +#define CHROME_BROWSER_UI_WEBUI_METACHAT_CDP_BRIDGE_H_
 +#include <string>
 +#include "base/memory/raw_ptr.h"
 +#include "base/values.h"
++#include "content/public/browser/devtools_agent_host.h"
 +namespace content { class WebContents; }
 +namespace metachat {
-+// CdpBridge: proxies CDP commands to a WebContents.
-+// Uses content::DevToolsAgentHost for protocol execution.
-+class CdpBridge {
++class CdpBridge : public content::DevToolsAgentHostClient {
 + public:
 +  CdpBridge();
-+  // Attach to a WebContents. Returns CDP port or -1 on failure.
 +  int Attach(content::WebContents* web_contents);
-+  // Detach from current WebContents.
 +  void Detach();
-+  // Send a CDP command. Returns result dict or error dict.
++  bool IsAttached() const { return attached_; }
 +  base::DictValue SendCommand(const std::string& method,
 +                                base::DictValue params);
-+  bool IsAttached() const { return port_ > 0; }
-+  int port() const { return port_; }
++  void DispatchProtocolMessage(content::DevToolsAgentHost* host,
++                               base::span<const uint8_t> message) override;
++  void AgentHostClosed(content::DevToolsAgentHost* host) override;
 + private:
-+  int port_ = -1;
-+  raw_ptr<content::WebContents> attached_web_contents_ = nullptr;
++  scoped_refptr<content::DevToolsAgentHost> host_;
++  bool attached_ = false;
++  int next_id_ = 1;
 +};
 +}  // namespace metachat
 +#endif
