@@ -9123,7 +9123,7 @@ index 0000000000000..e0b0062d59042
 +#include "content/public/browser/web_contents.h"
 +namespace metachat {
 +CdpBridge::CdpBridge() = default;
-+
++CdpBridge::~CdpBridge() = default;
 +int CdpBridge::Attach(content::WebContents* web_contents) {
 +  if (!web_contents || attached_) return -1;
 +  host_ = content::DevToolsAgentHost::GetOrCreateFor(web_contents);
@@ -9151,9 +9151,7 @@ index 0000000000000..e0b0062d59042
 +  command.Set("params", std::move(params));
 +  std::string json;
 +  base::JSONWriter::Write(command, &json);
-+  base::span<const uint8_t> msg(
-+      reinterpret_cast<const uint8_t*>(json.data()), json.size());
-+  host_->DispatchProtocolMessage(this, msg);
++  host_->DispatchProtocolMessage(this, base::as_byte_span(json));
 +  base::DictValue ok;
 +  ok.Set("status", "sent");
 +  return ok;
@@ -9178,7 +9176,7 @@ new file mode 100644
 index 0000000000000..05186982fff5c
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/cdp_bridge.h
-@@ -0,0 +1,27 @@
+@@ -0,0 +1,28 @@
 +// Copyright 2025 The MetaChat Authors.
 +#ifndef CHROME_BROWSER_UI_WEBUI_METACHAT_CDP_BRIDGE_H_
 +#define CHROME_BROWSER_UI_WEBUI_METACHAT_CDP_BRIDGE_H_
@@ -9191,6 +9189,7 @@ index 0000000000000..05186982fff5c
 +class CdpBridge : public content::DevToolsAgentHostClient {
 + public:
 +  CdpBridge();
++  ~CdpBridge() override;
 +  int Attach(content::WebContents* web_contents);
 +  void Detach();
 +  bool IsAttached() const { return attached_; }

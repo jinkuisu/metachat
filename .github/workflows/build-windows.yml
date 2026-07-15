@@ -231,6 +231,17 @@ jobs:
           Copy-Item "$outDir\*.pak" $dest
           Copy-Item "$outDir\*.bin" $dest -ErrorAction SilentlyContinue
           if (Test-Path "$outDir\locales") { Copy-Item -Recurse "$outDir\locales" $dest }
+          # Copy VC++ CRT manifest for portable deployment (no redist install needed)
+          $vcRedist = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Redist\MSVC"
+          $crtDir = Get-ChildItem "$vcRedist\*\onecore\x64\Microsoft.VC143.CRT" |
+                    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if ($crtDir) {
+            Copy-Item "$($crtDir.FullName)\*.manifest" $dest
+            Copy-Item "$($crtDir.FullName)\*.dll" $dest
+            Write-Host "CRT manifest + DLLs copied from $($crtDir.FullName)" -ForegroundColor Green
+          } else {
+            Write-Host "WARNING: VC143 CRT manifest not found at $vcRedist" -ForegroundColor Yellow
+          }
           Compress-Archive -Path "$dest\*" -DestinationPath "${{ github.workspace }}\metachat-browser-windows.zip" -Force
 
       - uses: actions/upload-artifact@v4
