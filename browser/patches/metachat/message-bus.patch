@@ -1215,6 +1215,7 @@ index 0000000000000..e3b0c44298fc1
 +#include "base/files/file_path.h"
 +#include "base/logging.h"
 +#include "chrome/browser/profiles/profile_manager.h"
+#include "chrome/browser/browser_process.h"
 +#include "chrome/browser/profiles/profile.h"
 +#include "chrome/browser/ui/browser.h"
 +#include "chrome/browser/ui/browser_finder.h"

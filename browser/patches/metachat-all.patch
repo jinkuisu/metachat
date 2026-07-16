@@ -10240,6 +10240,7 @@ index 0000000000000..e3b0c44298fc1
 +#include "base/files/file_path.h"
 +#include "base/logging.h"
 +#include "chrome/browser/profiles/profile_manager.h"
+#include "chrome/browser/browser_process.h"
 +#include "chrome/browser/profiles/profile.h"
 +#include "chrome/browser/ui/browser.h"
 +#include "chrome/browser/ui/browser_finder.h"
@@ -10401,7 +10402,7 @@ index 0000000000000..e3b0c44298fc0
 diff --git a/chrome/browser/ui/views/frame/contents_container_view.h b/chrome/browser/ui/views/frame/contents_container_view.h
 --- a/chrome/browser/ui/views/frame/contents_container_view.h
 +++ b/chrome/browser/ui/views/frame/contents_container_view.h
-@@ -105,6 +105,12 @@
+@@ -103,6 +103,12 @@
    TabModalDialogHost* web_contents_modal_dialog_host() {
      return &web_contents_modal_dialog_host_;
    }
