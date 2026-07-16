@@ -74,7 +74,7 @@ index 0000000000000..1970d97fc58c9
 +std::vector<Account> AccountStore::LoadAll() { return LoadFromFile(GetPath()); }
 +bool AccountStore::SaveAll(const std::vector<Account>& accounts) { return SaveToFile(GetPath(), accounts); }
 +}  // namespace metachat
-\ No newline at end of file
++\ No newline at end of file
 diff --git a/chrome/browser/ui/webui/metachat/account_store.h b/chrome/browser/ui/webui/metachat/account_store.h
 new file mode 100644
 index 0000000000000..44a8cbc9a26fa
@@ -107,7 +107,7 @@ index 0000000000000..44a8cbc9a26fa
 +};
 +}  // namespace metachat
 +#endif
-\ No newline at end of file
++\ No newline at end of file
 diff --git a/chrome/browser/ui/webui/metachat/cdp_bridge.cc b/chrome/browser/ui/webui/metachat/cdp_bridge.cc
 new file mode 100644
 index 0000000000000..e0b0062d59042
@@ -170,7 +170,7 @@ index 0000000000000..e0b0062d59042
 +}
 +
 +}  // namespace metachat
-\ No newline at end of file
++\ No newline at end of file
 diff --git a/chrome/browser/ui/webui/metachat/cdp_bridge.h b/chrome/browser/ui/webui/metachat/cdp_bridge.h
 new file mode 100644
 index 0000000000000..05186982fff5c
@@ -205,7 +205,7 @@ index 0000000000000..05186982fff5c
 +};
 +}  // namespace metachat
 +#endif
-\ No newline at end of file
++\ No newline at end of file
 diff --git a/chrome/browser/ui/webui/metachat/data_model.cc b/chrome/browser/ui/webui/metachat/data_model.cc
 new file mode 100644
 index 0000000000000..0332b19113ae3
@@ -377,7 +377,7 @@ index 0000000000000..0332b19113ae3
 +std::string GenerateId() { return base::Uuid::GenerateRandomV4().AsLowercaseString(); }
 +uint64_t GenerateSeed() { return base::RandUint64(); }
 +}  // namespace metachat
-\ No newline at end of file
++\ No newline at end of file
 diff --git a/chrome/browser/ui/webui/metachat/data_model.h b/chrome/browser/ui/webui/metachat/data_model.h
 new file mode 100644
 index 0000000000000..54409cc234127
@@ -569,7 +569,7 @@ index 0000000000000..08cfcc4015447
 +  return log_dir_.AppendASCII(filename);
 +}
 +}  // namespace metachat
-\ No newline at end of file
++\ No newline at end of file
 diff --git a/chrome/browser/ui/webui/metachat/event_log.h b/chrome/browser/ui/webui/metachat/event_log.h
 new file mode 100644
 index 0000000000000..8c151b095d81f
@@ -595,13 +595,13 @@ index 0000000000000..8c151b095d81f
 +};
 +}  // namespace metachat
 +#endif
-\ No newline at end of file
++\ No newline at end of file
 diff --git a/chrome/browser/ui/webui/metachat/message_bus.cc b/chrome/browser/ui/webui/metachat/message_bus.cc
 new file mode 100644
 index 0000000000000..5429b0264df5f
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/message_bus.cc
-@@ -0,0 +1,403 @@
+@@ -0,0 +1,429 @@
 +// MetaChat: Message bus - WebUI <-> C++ bidirectional communication
 +// Copyright 2025 The MetaChat Authors. All rights reserved.
 +
@@ -672,8 +672,8 @@ index 0000000000000..5429b0264df5f
 +  profile_ = Profile::FromWebUI(web_ui());
 +  account_store_ = std::make_unique<metachat::AccountStore>(profile_);
 +  content::WebContents* wc = web_ui()->GetWebContents();
-  Browser* browser = chrome::FindBrowserWithTab(wc);
-  window_manager_ = std::make_unique<metachat::WindowManager>(browser);
++Browser* browser = chrome::FindBrowserWithTab(wc);
++window_manager_ = std::make_unique<metachat::WindowManager>(browser);
 +  base::FilePath log_dir = profile_->GetPath()
 +      .Append(FILE_PATH_LITERAL("metachat"))
 +      .Append(FILE_PATH_LITERAL("events"));
@@ -861,16 +861,16 @@ index 0000000000000..5429b0264df5f
 +      return;
 +    }
 +    auto acc_list2 = account_store_->LoadAll();
-    auto it2 = std::find_if(acc_list2.begin(), acc_list2.end(),
-        [&](const metachat::Account& a) { return a.id == *account_id; });
-    if (it2 == acc_list2.end()) {
-      SendResponse("webs", action, MakeError("not_found", ""), request_id);
-      return;
-    }
-    base::FilePath acc_dir2 = profile_->GetPath()
-        .Append(FILE_PATH_LITERAL("metachat_accounts"))
-        .AppendASCII(*account_id);
-    window_manager_->SwitchTo(*account_id, GURL(*url_str), acc_dir2);
++auto it2 = std::find_if(acc_list2.begin(), acc_list2.end(),
++[&](const metachat::Account& a) { return a.id == *account_id; });
++if (it2 == acc_list2.end()) {
++SendResponse("webs", action, MakeError("not_found", ""), request_id);
++return;
++}
++base::FilePath acc_dir2 = profile_->GetPath()
++.Append(FILE_PATH_LITERAL("metachat_accounts"))
++.AppendASCII(*account_id);
++window_manager_->SwitchTo(*account_id, GURL(*url_str), acc_dir2);
 +    base::DictValue result;
 +    result.Set("status", "opened");
 +    result.Set("account_id", *account_id);
@@ -902,16 +902,16 @@ index 0000000000000..5429b0264df5f
 +      return;
 +    }
 +    auto acc_list4 = account_store_->LoadAll();
-    auto it4 = std::find_if(acc_list4.begin(), acc_list4.end(),
-        [&](const metachat::Account& a) { return a.id == *account_id; });
-    if (it4 == acc_list4.end()) {
-      SendResponse("webs", action, MakeError("not_found", ""), request_id);
-      return;
-    }
-    base::FilePath acc_dir4 = profile_->GetPath()
-        .Append(FILE_PATH_LITERAL("metachat_accounts"))
-        .AppendASCII(*account_id);
-    window_manager_->SwitchTo(*account_id, GURL(), acc_dir4);
++auto it4 = std::find_if(acc_list4.begin(), acc_list4.end(),
++[&](const metachat::Account& a) { return a.id == *account_id; });
++if (it4 == acc_list4.end()) {
++SendResponse("webs", action, MakeError("not_found", ""), request_id);
++return;
++}
++base::FilePath acc_dir4 = profile_->GetPath()
++.Append(FILE_PATH_LITERAL("metachat_accounts"))
++.AppendASCII(*account_id);
++window_manager_->SwitchTo(*account_id, GURL(), acc_dir4);
 +    base::DictValue result;
 +    result.Set("status", "focused");
 +    SendResponse("webs", action, std::move(result), request_id);
@@ -1208,14 +1208,14 @@ new file mode 100644
 index 0000000000000..e3b0c44298fc1
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/window_manager.cc
-@@ -0,0 +1,113 @@
+@@ -0,0 +1,108 @@
 +// Copyright 2025 The MetaChat Authors.
 +#include "chrome/browser/ui/webui/metachat/window_manager.h"
 +
 +#include "base/files/file_path.h"
 +#include "base/logging.h"
 +#include "chrome/browser/profiles/profile_manager.h"
-#include "chrome/browser/browser_process.h"
++#include "chrome/browser/browser_process.h"
 +#include "chrome/browser/profiles/profile.h"
 +#include "chrome/browser/ui/browser.h"
 +#include "chrome/browser/ui/browser_finder.h"
@@ -1318,13 +1318,13 @@ index 0000000000000..e3b0c44298fc1
 +}
 +
 +}  // namespace metachat
-
++
 diff --git a/chrome/browser/ui/webui/metachat/window_manager.h b/chrome/browser/ui/webui/metachat/window_manager.h
 new file mode 100644
 index 0000000000000..e3b0c44298fc0
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/window_manager.h
-@@ -0,0 +1,57 @@
+@@ -0,0 +1,48 @@
 +// Copyright 2025 The MetaChat Authors.
 +#ifndef CHROME_BROWSER_UI_WEBUI_METACHAT_WINDOW_MANAGER_H_
 +#define CHROME_BROWSER_UI_WEBUI_METACHAT_WINDOW_MANAGER_H_
@@ -1373,3 +1373,4 @@ index 0000000000000..e3b0c44298fc0
 +
 +}  // namespace metachat
 +#endif
++

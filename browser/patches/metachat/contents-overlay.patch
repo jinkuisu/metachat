@@ -1,46 +1,23 @@
-diff --git a/chrome/browser/ui/views/frame/contents_container_view.h b/chrome/browser/ui/views/frame/contents_container_view.h
---- a/chrome/browser/ui/views/frame/contents_container_view.h
-+++ b/chrome/browser/ui/views/frame/contents_container_view.h
-@@ -105,6 +105,12 @@
-   TabModalDialogHost* web_contents_modal_dialog_host() {
-     return &web_contents_modal_dialog_host_;
-   }
-+  // MetaChat overlay for embedding account WebContents
-+  views::WebView* metachat_overlay_web_view() const {
-+    return metachat_overlay_web_view_;
-+  }
-+
-   views::View* indigo_overlay_view() { return indigo_overlay_view_; }
-
-@@ -218,6 +224,9 @@
-   raw_ptr<views::View> indigo_overlay_view_ = nullptr;
-
-+  // MetaChat overlay for embedding per-account WebContents
-+  // Positioned at x=kSidebarWidth in layout
-+  raw_ptr<views::WebView> metachat_overlay_web_view_ = nullptr;
-+
-   // See `SetTargetContentSize()`.
-   std::optional<gfx::Outsets> target_content_bounds_;
-
 diff --git a/chrome/browser/ui/views/frame/contents_container_view.cc b/chrome/browser/ui/views/frame/contents_container_view.cc
+index d7324e655ef4a..7195634a6aaeb 100644
 --- a/chrome/browser/ui/views/frame/contents_container_view.cc
 +++ b/chrome/browser/ui/views/frame/contents_container_view.cc
-@@ -160,6 +160,11 @@
+@@ -160,6 +160,11 @@ ContentsContainerView::ContentsContainerView(BrowserView* browser_view)
              .Build());
    }
-
+ 
++
 +  // MetaChat overlay: embeds per-account WebContents (initially hidden)
 +  auto metachat_overlay = std::make_unique<views::WebView>(browser_view->GetProfile());
 +  metachat_overlay->SetVisible(false);
 +  metachat_overlay_web_view_ = AddChildView(std::move(metachat_overlay));
-+
    mini_toolbar_ = AddChildView(std::make_unique<MultiContentsViewMiniToolbar>(
        browser_view, contents_view_));
-
-@@ -567,6 +572,17 @@
+ 
+@@ -567,6 +572,18 @@ views::ProposedLayout ContentsContainerView::CalculateProposedLayout(
+   layouts.child_layouts.emplace_back(
        data_protection_overlay_view_.get(),
        data_protection_overlay_view_->GetVisible(), full_contents_bounds);
-
 +  // MetaChat account overlay: positioned at x=48 for sidebar
 +  if (metachat_overlay_web_view_) {
 +    constexpr int kSidebarWidth = 48;
@@ -53,6 +30,32 @@ diff --git a/chrome/browser/ui/views/frame/contents_container_view.cc b/chrome/b
 +        overlay_bounds, size_bounds);
 +  }
 +
+ 
    // Actor Overlay view bounds are the same as the contents view.
    if (actor_overlay_web_view_) {
-     layouts.child_layouts.emplace_back(
+diff --git a/chrome/browser/ui/views/frame/contents_container_view.h b/chrome/browser/ui/views/frame/contents_container_view.h
+index b26ccd8324d3b..960cbd8045714 100644
+--- a/chrome/browser/ui/views/frame/contents_container_view.h
++++ b/chrome/browser/ui/views/frame/contents_container_view.h
+@@ -104,6 +104,11 @@ class ContentsContainerView : public views::View,
+     return &web_contents_modal_dialog_host_;
+   }
+ 
++  // MetaChat overlay for embedding account WebContents
++  views::WebView* metachat_overlay_web_view() const {
++    return metachat_overlay_web_view_;
++  }
++
+   views::View* indigo_overlay_view() { return indigo_overlay_view_; }
+ 
+   // Sets the contents resizing strategy.
+@@ -218,6 +223,9 @@ class ContentsContainerView : public views::View,
+   // Toolbar for chrome/browser/indigo/, which determines where in the content
+   // area it wants to float.
+   raw_ptr<views::View> indigo_overlay_view_ = nullptr;
++  // MetaChat overlay for embedding per-account WebContents
++  // Positioned at x=kSidebarWidth in layout
++  raw_ptr<views::WebView> metachat_overlay_web_view_ = nullptr;
+ 
+   // See `SetTargetContentSize()`.
+   std::optional<gfx::Outsets> target_content_bounds_;
