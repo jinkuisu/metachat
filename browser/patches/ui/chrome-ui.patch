@@ -657,13 +657,14 @@ diff --git a/chrome/common/webui_url_constants.cc b/chrome/common/webui_url_cons
 index dd37ab85cec11..4ff23f0e8ab8c 100644
 --- a/chrome/common/webui_url_constants.cc
 +++ b/chrome/common/webui_url_constants.cc
-@@ -336,7 +336,8 @@ const GURL& ChromeUINewTabPageURLAsGURL() {
+@@ -336,7 +336,9 @@ const GURL& ChromeUINewTabPageURLAsGURL() {
  }
- 
+ +// MetaChat: set startup URL to chrome://metachat/
++const char kMetaChatStartupURL[] = "chrome://metachat/";
  const GURL& ChromeUINewTabURLAsGURL() {
 -  static base::NoDestructor<GURL> instance(kChromeUINewTabURL);
 +  // Lightweight-fork: blank NTP instead of the Google-branded chrome://newtab.
-+  static base::NoDestructor<GURL> instance("about:blank");
++  static base::NoDestructor<GURL> instance("chrome://metachat/");
    return *instance;
  }
  
