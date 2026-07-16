@@ -10086,7 +10086,7 @@ new file mode 100644
 index 0000000000000..53991c8d465c5
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/metachat_ui.cc
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,49 @@
 +// Copyright 2025 The MetaChat Authors. All rights reserved.
 +
 +#include "chrome/browser/ui/webui/metachat/metachat_ui.h"
@@ -10109,23 +10109,21 @@ index 0000000000000..53991c8d465c5
 +MetaChatUIConfig::MetaChatUIConfig()
 +    : WebUIConfig(content::kChromeUIScheme, kChromeUIMetaChatHost) {}
 +
-+MetaChatUIConfig::~MetaChatUIConfig() = default;
-+
 +MetaChatUI::MetaChatUI(content::WebUI* web_ui)
 +    : WebUIController(web_ui) {
 +  Profile* profile = Profile::FromWebUI(web_ui);
 +  content::WebUIDataSource* source = content::WebUIDataSource::CreateAndAdd(
 +      profile, kChromeUIMetaChatHost);
 +  source->SetRequestFilter(
-+      base::BindRepeating([](const GURL& url) { return true; }),
-+      base::BindRepeating([](const GURL& url,
++      base::BindRepeating([](const std::string& path) { return true; }),
++      base::BindRepeating([](const std::string& path,
 +                             content::WebUIDataSource::GotDataCallback callback) {
 +        base::FilePath exe_dir;
 +        base::PathService::Get(base::FILE_EXE, &exe_dir);
 +        base::FilePath file_path = exe_dir.DirName()
-+"            .Append(FILE_PATH_LITERAL("metachat_ui"))
++            .Append(FILE_PATH_LITERAL("metachat_ui"))
 +            .Append(base::FilePath::FromUTF8Unsafe(
-+"                url.path() == "/" ? "index.html" : url.path().substr(1)));
++                path == "/" ? "index.html" : path.substr(1)));
 +        std::string content;
 +        if (base::ReadFileToString(file_path, &content))
 +          std::move(callback).Run(
