@@ -20,3 +20,4 @@ metachat/message-bus.patch
 ui/chrome-ui.patch
 ui/search-engines.patch
 ai-agent/agent-layer.patch
+metachat/contents-overlay.patch
