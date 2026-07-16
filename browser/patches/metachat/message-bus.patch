@@ -26,7 +26,6 @@ index 0000000000000..be988a35866f0
 +
 +  public_deps = [
 +    "//base",
-+    "//base:trace_event",
 +    "//chrome/browser/profiles:profile",
 +    "//chrome/common",
 +    "//content/public/browser",

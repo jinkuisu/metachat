@@ -9004,7 +9004,7 @@ new file mode 100644
 index 0000000000000..be988a35866f0
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/BUILD.gn
-@@ -0,0 +1,28 @@
+@@ -0,0 +1,27 @@
 +# Copyright 2025 The MetaChat Authors. All rights reserved.
 +
 +source_set("metachat") {
@@ -9027,7 +9027,6 @@ index 0000000000000..be988a35866f0
 +
 +  public_deps = [
 +    "//base",
-+    "//base:trace_event",
 +    "//chrome/browser/profiles:profile",
 +    "//chrome/common",
 +    "//content/public/browser",
