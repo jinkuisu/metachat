@@ -671,7 +671,9 @@ index 0000000000000..5429b0264df5f
 +void MetaChatMessageBus::RegisterMessages() {
 +  profile_ = Profile::FromWebUI(web_ui());
 +  account_store_ = std::make_unique<metachat::AccountStore>(profile_);
-+  window_manager_ = std::make_unique<metachat::WindowManager>(profile_);
++  content::WebContents* wc = web_ui()->GetWebContents();
+  Browser* browser = chrome::FindBrowserWithTab(wc);
+  window_manager_ = std::make_unique<metachat::WindowManager>(browser);
 +  base::FilePath log_dir = profile_->GetPath()
 +      .Append(FILE_PATH_LITERAL("metachat"))
 +      .Append(FILE_PATH_LITERAL("events"));
@@ -858,7 +860,17 @@ index 0000000000000..5429b0264df5f
 +      SendResponse("webs", action, MakeError("missing_fields", ""), request_id);
 +      return;
 +    }
-+    window_manager_->OpenOrFocus(*account_id, GURL(*url_str));
++    auto acc_list2 = account_store_->LoadAll();
+    auto it2 = std::find_if(acc_list2.begin(), acc_list2.end(),
+        [&](const metachat::Account& a) { return a.id == *account_id; });
+    if (it2 == acc_list2.end()) {
+      SendResponse("webs", action, MakeError("not_found", ""), request_id);
+      return;
+    }
+    base::FilePath acc_dir2 = profile_->GetPath()
+        .Append(FILE_PATH_LITERAL("metachat_accounts"))
+        .AppendASCII(*account_id);
+    window_manager_->SwitchTo(*account_id, GURL(*url_str), acc_dir2);
 +    base::DictValue result;
 +    result.Set("status", "opened");
 +    result.Set("account_id", *account_id);
@@ -879,7 +891,7 @@ index 0000000000000..5429b0264df5f
 +      SendResponse("webs", action, MakeError("missing_id", ""), request_id);
 +      return;
 +    }
-+    window_manager_->Hide(*account_id);
++    window_manager_->ShowDashboard();
 +    base::DictValue result;
 +    result.Set("status", "hidden");
 +    SendResponse("webs", action, std::move(result), request_id);
@@ -889,9 +901,45 @@ index 0000000000000..5429b0264df5f
 +      SendResponse("webs", action, MakeError("missing_id", ""), request_id);
 +      return;
 +    }
-+    window_manager_->Focus(*account_id);
++    auto acc_list4 = account_store_->LoadAll();
+    auto it4 = std::find_if(acc_list4.begin(), acc_list4.end(),
+        [&](const metachat::Account& a) { return a.id == *account_id; });
+    if (it4 == acc_list4.end()) {
+      SendResponse("webs", action, MakeError("not_found", ""), request_id);
+      return;
+    }
+    base::FilePath acc_dir4 = profile_->GetPath()
+        .Append(FILE_PATH_LITERAL("metachat_accounts"))
+        .AppendASCII(*account_id);
+    window_manager_->SwitchTo(*account_id, GURL(), acc_dir4);
 +    base::DictValue result;
 +    result.Set("status", "focused");
++    SendResponse("webs", action, std::move(result), request_id);
++  } else if (action == "switch") {
++    const std::string* account_id = payload->FindString("account_id");
++    const std::string* url_str = payload->FindString("url");
++    if (!account_id || !url_str) {
++      SendResponse("webs", action, MakeError("missing_fields", ""), request_id);
++      return;
++    }
++    auto acc_list = account_store_->LoadAll();
++    auto it = std::find_if(acc_list.begin(), acc_list.end(),
++        [&](const metachat::Account& a) { return a.id == *account_id; });
++    if (it == acc_list.end()) {
++      SendResponse("webs", action, MakeError("not_found", ""), request_id);
++      return;
++    }
++    base::FilePath acc_dir = profile_->GetPath()
++        .Append(FILE_PATH_LITERAL("metachat_accounts"))
++        .AppendASCII(*account_id);
++    window_manager_->SwitchTo(*account_id, GURL(*url_str), acc_dir);
++    base::DictValue result;
++    result.Set("status", "switched");
++    SendResponse("webs", action, std::move(result), request_id);
++  } else if (action == "show_dashboard") {
++    window_manager_->ShowDashboard();
++    base::DictValue result;
++    result.Set("status", "dashboard");
 +    SendResponse("webs", action, std::move(result), request_id);
 +  } else {
 +    SendResponse("webs", action,
@@ -1086,7 +1134,7 @@ new file mode 100644
 index 0000000000000..53991c8d465c5
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/metachat_ui.cc
-@@ -0,0 +1,35 @@
+@@ -0,0 +1,34 @@
 +// Copyright 2025 The MetaChat Authors. All rights reserved.
 +
 +#include "chrome/browser/ui/webui/metachat/metachat_ui.h"
@@ -1116,7 +1164,6 @@ index 0000000000000..53991c8d465c5
 +  Profile* profile = Profile::FromWebUI(web_ui);
 +  content::WebUIDataSource* source = content::WebUIDataSource::CreateAndAdd(
 +      profile, kChromeUIMetaChatHost);
-+  source->SetDefaultResource(100);
 +  DVLOG(1) << "MetaChat: UI created";
 +  web_ui->AddMessageHandler(std::make_unique<MetaChatMessageBus>());
 +}
@@ -1158,113 +1205,170 @@ index 0000000000000..a1c9e20808726
 +#endif  // CHROME_BROWSER_UI_WEBUI_METACHAT_METACHAT_UI_H_
 diff --git a/chrome/browser/ui/webui/metachat/window_manager.cc b/chrome/browser/ui/webui/metachat/window_manager.cc
 new file mode 100644
-index 0000000000000..7f965c99e73ec
+index 0000000000000..e3b0c44298fc1
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/window_manager.cc
-@@ -0,0 +1,66 @@
+@@ -0,0 +1,113 @@
 +// Copyright 2025 The MetaChat Authors.
 +#include "chrome/browser/ui/webui/metachat/window_manager.h"
++
++#include "base/files/file_path.h"
 +#include "base/logging.h"
++#include "chrome/browser/profiles/profile_manager.h"
++#include "chrome/browser/profiles/profile.h"
 +#include "chrome/browser/ui/browser.h"
-+#include "chrome/browser/ui/browser_commands.h"
-+#include "chrome/browser/ui/navigator/browser_navigator.h"
-+#include "chrome/browser/ui/navigator/browser_navigator_params.h"
++#include "chrome/browser/ui/browser_finder.h"
 +#include "chrome/browser/ui/browser_window.h"
++#include "chrome/browser/ui/views/frame/browser_view.h"
++#include "chrome/browser/ui/views/frame/contents_container_view.h"
++#include "content/public/browser/navigation_controller.h"
 +#include "content/public/browser/web_contents.h"
++#include "ui/views/controls/webview/webview.h"
++
 +namespace metachat {
-+WindowManager::WindowManager(Profile* host_profile) : host_profile_(host_profile) {}
++
++WindowManager::WindowManager(Browser* browser)
++    : browser_(browser) {}
++
 +WindowManager::~WindowManager() {
-+  for (auto& [id, entry] : windows_) {
-+    if (entry.browser && entry.browser->window()) {
-+      entry.browser->window()->Close();
++  accounts_.clear();
++}
++
++void WindowManager::SwitchTo(const std::string& account_id,
++                              const GURL& url,
++                              const base::FilePath& profile_dir) {
++  if (!active_account_id_.empty() && accounts_.count(active_account_id_)) {
++    accounts_[active_account_id_].web_contents->WasHidden();
++  }
++  if (!accounts_.count(account_id)) {
++    ProfileManager* pm = g_browser_process->profile_manager();
++    Profile* profile = pm->GetProfile(profile_dir);
++    if (!profile) {
++      LOG(ERROR) << "WM: failed to create profile for " << account_id;
++      return;
 +    }
++    content::WebContents::CreateParams params(profile);
++    auto wc = content::WebContents::Create(params);
++    content::NavigationController::LoadURLParams load_params(url);
++    load_params.transition_type = ui::PAGE_TRANSITION_TYPED;
++    wc->GetController().LoadURLWithParams(load_params);
++    accounts_[account_id] = {std::move(wc)};
 +  }
-+}
-+Browser* WindowManager::OpenOrFocus(const std::string& account_id, const GURL& url) {
-+  auto it = windows_.find(account_id);
-+  if (it != windows_.end() && it->second.browser) {
-+    DVLOG(1) << "WM: focus " << account_id;
-+    it->second.browser->window()->Show();
-+    return it->second.browser;
++  BrowserView* bv = BrowserView::GetBrowserViewForBrowser(browser_);
++  views::WebView* overlay = bv->contents_container()->metachat_overlay_web_view();
++  if (!overlay) {
++    LOG(ERROR) << "WM: overlay not available";
++    return;
 +  }
-+  DVLOG(1) << "WM: create " << account_id;
-+  Browser::CreateParams params(Browser::TYPE_NORMAL, host_profile_, false);
-+  params.initial_bounds = gfx::Rect(100, 100, 1280, 800);
-+  Browser* browser = Browser::Create(params);
-+  NavigateParams nav_params(browser, url, ui::PAGE_TRANSITION_TYPED);
-+  nav_params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
-+  Navigate(&nav_params);
-+  windows_[account_id] = {browser, nav_params.navigated_or_inserted_contents.get()};
-+  browser->window()->Show();
-+  return browser;
++  auto& entry = accounts_[account_id];
++  overlay->SetWebContents(entry.web_contents.get());
++  overlay->SetVisible(true);
++  entry.web_contents->WasShown();
++  entry.web_contents->Focus();
++  active_account_id_ = account_id;
++  DVLOG(1) << "WM: switched to " << account_id;
 +}
-+void WindowManager::Hide(const std::string& account_id) {
-+  auto it = windows_.find(account_id);
-+  if (it != windows_.end() && it->second.browser && it->second.browser->window()) {
-+    DVLOG(1) << "WM: hide " << account_id;
-+    it->second.browser->window()->Hide();
-+  }
++
++void WindowManager::Navigate(const std::string& account_id,
++                              const GURL& url) {
++  auto it = accounts_.find(account_id);
++  if (it == accounts_.end()) return;
++  content::NavigationController::LoadURLParams load_params(url);
++  it->second.web_contents->GetController().LoadURLWithParams(load_params);
 +}
++
 +void WindowManager::Close(const std::string& account_id) {
-+  auto it = windows_.find(account_id);
-+  if (it != windows_.end() && it->second.browser) {
-+    DVLOG(1) << "WM: close " << account_id;
-+    chrome::CloseWindow(it->second.browser);
-+    windows_.erase(it);
++  auto it = accounts_.find(account_id);
++  if (it == accounts_.end()) return;
++  if (it->second.web_contents && account_id == active_account_id_) {
++    BrowserView* bv = BrowserView::GetBrowserViewForBrowser(browser_);
++    views::WebView* overlay = bv->contents_container()->metachat_overlay_web_view();
++    if (overlay) {
++      overlay->SetWebContents(nullptr);
++      overlay->SetVisible(false);
++    }
++    it->second.web_contents->WasHidden();
 +  }
++  accounts_.erase(it);
++  if (account_id == active_account_id_) active_account_id_.clear();
++  DVLOG(1) << "WM: closed " << account_id;
 +}
-+Browser* WindowManager::GetBrowser(const std::string& account_id) const {
-+  auto it = windows_.find(account_id);
-+  return it != windows_.end() ? it->second.browser : nullptr;
-+}
-+content::WebContents* WindowManager::GetWebContents(const std::string& account_id) const {
-+  auto it = windows_.find(account_id);
-+  return it != windows_.end() ? it->second.web_contents : nullptr;
-+}
-+void WindowManager::Focus(const std::string& account_id) {
-+  auto it = windows_.find(account_id);
-+  if (it != windows_.end() && it->second.browser && it->second.browser->window()) {
-+    it->second.browser->window()->Show();
++
++void WindowManager::ShowDashboard() {
++  BrowserView* bv = BrowserView::GetBrowserViewForBrowser(browser_);
++  views::WebView* overlay = bv->contents_container()->metachat_overlay_web_view();
++  if (overlay) {
++    if (!active_account_id_.empty() && accounts_.count(active_account_id_)) {
++      accounts_[active_account_id_].web_contents->WasHidden();
++    }
++    overlay->SetWebContents(nullptr);
++    overlay->SetVisible(false);
 +  }
++  active_account_id_.clear();
++  DVLOG(1) << "WM: dashboard";
 +}
++
++void WindowManager::OnResize() {}
++
++content::WebContents* WindowManager::GetWebContents(
++    const std::string& account_id) const {
++  auto it = accounts_.find(account_id);
++  return it != accounts_.end() ? it->second.web_contents.get() : nullptr;
++}
++
 +}  // namespace metachat
-\ No newline at end of file
+
 diff --git a/chrome/browser/ui/webui/metachat/window_manager.h b/chrome/browser/ui/webui/metachat/window_manager.h
 new file mode 100644
-index 0000000000000..e40d78700377e
+index 0000000000000..e3b0c44298fc0
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/window_manager.h
-@@ -0,0 +1,31 @@
+@@ -0,0 +1,57 @@
 +// Copyright 2025 The MetaChat Authors.
 +#ifndef CHROME_BROWSER_UI_WEBUI_METACHAT_WINDOW_MANAGER_H_
 +#define CHROME_BROWSER_UI_WEBUI_METACHAT_WINDOW_MANAGER_H_
++
++#include <memory>
 +#include <string>
 +#include <unordered_map>
++
 +#include "base/memory/raw_ptr.h"
++#include "content/public/browser/web_contents.h"
++
 +class Browser;
 +class Profile;
 +class GURL;
-+namespace content { class WebContents; }
++
++namespace views {
++class WebView;
++}
++
 +namespace metachat {
++
++constexpr int kSidebarWidth = 48;
++
 +class WindowManager {
 + public:
-+  explicit WindowManager(Profile* host_profile);
++  explicit WindowManager(Browser* browser);
 +  ~WindowManager();
-+  Browser* OpenOrFocus(const std::string& account_id, const GURL& url);
-+  void Hide(const std::string& account_id);
++
++  void SwitchTo(const std::string& account_id, const GURL& url,
++                 const base::FilePath& profile_dir);
++  void Navigate(const std::string& account_id, const GURL& url);
 +  void Close(const std::string& account_id);
-+  Browser* GetBrowser(const std::string& account_id) const;
++  void ShowDashboard();
++  void OnResize();
 +  content::WebContents* GetWebContents(const std::string& account_id) const;
-+  void Focus(const std::string& account_id);
++
 + private:
-+  struct WindowEntry {
-+    raw_ptr<Browser> browser = nullptr;
-+    raw_ptr<content::WebContents> web_contents = nullptr;
++  struct AccountEntry {
++    std::unique_ptr<content::WebContents> web_contents;
 +  };
-+  std::unordered_map<std::string, WindowEntry> windows_;
-+  raw_ptr<Profile> host_profile_ = nullptr;
++
++  raw_ptr<Browser> browser_;
++  std::unordered_map<std::string, AccountEntry> accounts_;
++  std::string active_account_id_;
 +};
++
 +}  // namespace metachat
 +#endif
-\ No newline at end of file
- 
