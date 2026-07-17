@@ -232,7 +232,7 @@ jobs:
           Copy-Item "$outDir\*.pak" $dest
           Copy-Item "$outDir\*.bin" $dest -ErrorAction SilentlyContinue
           if (Test-Path "$outDir\locales") { Copy-Item -Recurse "$outDir\locales" $dest }
-          Copy-Item -Recurse "${{ github.workspace }}\metachat\ui" "$dest\metachat_ui"
+          Copy-Item -Recurse "${{ github.workspace }}\metachat\metachat\ui" "$dest\metachat_ui"
           $vcRedist = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Redist\MSVC"
           $crtDir = Get-ChildItem "$vcRedist\*\onecore\x64\Microsoft.VC143.CRT" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
           if ($crtDir) { Copy-Item "$($crtDir.FullName)\*.dll" $dest; Write-Host "CRT DLLs copied" -ForegroundColor Green }
