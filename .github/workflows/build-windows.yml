@@ -1,4 +1,4 @@
-﻿name: Build MetaChat Browser (Windows) [self-hosted]
+name: Build MetaChat Browser (Windows)
 
 on:
   workflow_dispatch:
@@ -13,16 +13,25 @@ env:
   CHROMIUM_DIR: C:\chromium
   SRC_DIR: C:\chromium\src
   DEPOT_TOOLS_WIN_TOOLCHAIN: "0"
-  vs2022_install: 'C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools'
+  vs2022_install: 'C:\Program Files\Microsoft Visual Studio\2022\BuildTools'
   GYP_MSVS_VERSION: "2022"
   SISO_JOBS: 1
 
 jobs:
   build:
-    runs-on: self-hosted
+    runs-on: windows-2022
     timeout-minutes: 480
 
     steps:
+      - name: Restore Chromium cache
+        id: cache-chromium
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.CHROMIUM_DIR }}
+          key: chromium-${{ env.CHROMIUM_COMMIT }}
+          restore-keys: |
+            chromium-150.0.
+            chromium-
       - uses: actions/checkout@v4
         with:
           path: metachat
@@ -30,52 +39,40 @@ jobs:
       - name: Setup depot_tools
         shell: pwsh
         run: |
-          # Add depot_tools to PATH for subsequent steps
-          echo "C:\depot_tools" | Out-File -FilePath "$env:GITHUB_PATH" -Encoding utf8 -Append
-          # Initialize depot_tools (creates python3_bin_reldir.txt)
+          git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git C:\depot_tools
+          echo "C:\depot_tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           C:\depot_tools\update_depot_tools.bat
-          if (-not (Test-Path "C:\depot_tools\python3_bin_reldir.txt")) {
-            # update_depot_tools.bat didn't create it (common as NETWORK SERVICE).
-            # Find real Python 3 and create the file manually.
-            # depot_tools is in system PATH (set by Administrator),
-            # so its python3.bat wrapper shadows the real Python.
-            # Skip depot_tools scripts and find the real Python 3.
-            $py = Get-Command python3 -ErrorAction SilentlyContinue `
-                | Where-Object { $_.Source -notmatch 'depot_tools' }
-            if (-not $py) {
-              $py = Get-Command python -ErrorAction SilentlyContinue `
-                  | Where-Object { $_.Source -notmatch 'depot_tools' }
-            }
-            if ($py) {
-              $pyDir = (Get-Item $py.Source).DirectoryName
-              # depot_tools wrapper looks for python3.exe specifically.
-              # If only python.exe exists, create a python3.bat helper.
-              if (-not (Test-Path "$pyDir\python3.exe")) {
-                if (Test-Path "$pyDir\python.exe") {
-                  $wrapper = "@echo off" + [char]10 + "python.exe %*"
-                  [System.IO.File]::WriteAllText("$pyDir\python3.bat", $wrapper)
-                }
-              }
-              $rel = [System.IO.Path]::GetRelativePath("C:\depot_tools", $pyDir)
-              [System.IO.File]::WriteAllText("C:\depot_tools\python3_bin_reldir.txt", $rel)
-              Write-Host "Created python3_bin_reldir.txt -> $rel" -ForegroundColor Green
-            } else {
-              Write-Host "WARNING: Cannot find Python 3 on system" -ForegroundColor Yellow
-            }
-          }
-          if (Test-Path "C:\depot_tools\python3_bin_reldir.txt") {
-            Write-Host "depot_tools initialized OK" -ForegroundColor Green
-          } else {
-            Write-Host "WARNING: python3_bin_reldir.txt still missing, will try native binaries" -ForegroundColor Yellow
-          }
+
+      - name: Setup VS2022
+        shell: pwsh
+        run: |
+          choco install visualstudio2022buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended" -y
+          choco install windows-sdk-10.0 -y
+
+      - name: Fetch Chromium source
+        if: steps.cache-chromium.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:CHROMIUM_DIR
+          cd $env:CHROMIUM_DIR
+          fetch --nohooks --no-history chromium
+          cd src
+          git fetch origin tag $env:CHROMIUM_COMMIT --depth=1
+          git checkout $env:CHROMIUM_COMMIT
+          gclient sync --with_branch_heads --with_tags --nohooks -D
+
+      - name: Save Chromium cache
+        if: steps.cache-chromium.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.CHROMIUM_DIR }}
+          key: chromium-${{ env.CHROMIUM_COMMIT }}
+
       - name: Reset and apply metachat-all.patch
         shell: pwsh
         run: |
           cd $env:SRC_DIR
-
-          # Reset tracked files to pristine state
           git checkout -f HEAD
-          # Remove untracked files left from previous patch runs
           git clean -fd
           $patchFile = "$env:GITHUB_WORKSPACE\metachat\browser\patches\metachat-all.patch"
           Write-Host "Applying metachat-all.patch..."
@@ -113,7 +110,7 @@ jobs:
             )
             foreach ($font in $fonts) {
               $url = "$baseUrl/$font"
-              $outPath = "$fontDir\$font"
+              $outPath = "$fontDir/$font"
               if (-not (Test-Path $outPath)) {
                 Write-Host "Downloading $font"
                 Invoke-WebRequest -Uri $url -OutFile $outPath -UseBasicParsing
@@ -138,30 +135,13 @@ jobs:
             "}"
           ), [System.Text.UTF8Encoding]::new($false))
 
-      - name: Download toolchains (if missing)
+      - name: Download toolchains
         shell: pwsh
         run: |
           cd $env:SRC_DIR
-          $stampPath = "third_party/llvm-build/Release+Asserts/cr_build_revision"
-          if (-not (Test-Path $stampPath)) {
-            $deps = Get-Content DEPS -Raw
-            if ($deps -match 'Win/clang-([a-z0-9-]+)\.tar\.xz') {
-              $rev = $matches[1]
-            } else {
-              $rev = "llvmorg-23-init-10931-g20b6ec66-11"
-            }
-            New-Item -ItemType Directory -Force -Path (Split-Path $stampPath)
-            Set-Content -Path $stampPath -Value "$rev" -NoNewline
-          }
-          if (-not (Test-Path "third_party/rust-toolchain/VERSION")) {
-            python3 tools\rust\update_rust.py
-          }
+          python3 tools\clang\scripts\update.py
+          python3 tools\rust\update_rust.py
 
-      - name: Run gclient hooks (restores modified dependencies)
-        shell: pwsh
-        run: |
-          cd $env:CHROMIUM_DIR
-          gclient runhooks
       - name: Generate LASTCHANGE
         shell: pwsh
         run: |
@@ -183,7 +163,6 @@ jobs:
             "symbol_level = 0" + [char]10 +
             "blink_symbol_level = 0" + [char]10 +
             "v8_symbol_level = 0" + [char]10 +
-            "enable_nacl = false" + [char]10 +
             "enable_remoting = false" + [char]10 +
             "enable_extensions = true" + [char]10 +
             "enable_plugins = true" + [char]10 +
@@ -201,25 +180,13 @@ jobs:
             "dawn_enable_vulkan_validation_layers = false" + [char]10 +
             "angle_enable_vulkan_validation_layers = false"
           ))
-          if (Test-Path "C:\depot_tools\python3_bin_reldir.txt") {
-            gn gen out\Release_GN_x64
-          } else {
-            Write-Host "Using native gn.exe from buildtools" -ForegroundColor Yellow
-            & "$env:SRC_DIR\buildtools\win\gn.exe" gen out\Release_GN_x64
-          }
+          gn gen out\Release_GN_x64
 
       - name: Build
         shell: pwsh
         run: |
           cd $env:SRC_DIR
-          if (Test-Path "C:\depot_tools\python3_bin_reldir.txt") {
-            autoninja -C out\Release_GN_x64 chrome
-          } else {
-            Write-Host "Using native ninja.exe from third_party" -ForegroundColor Yellow
-            $ramGB = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
-            $jobs = [math]::Max(2, [math]::Min($ramGB, 32))
-            & third_party\ninja\ninja.exe -j $jobs -C out\Release_GN_x64 chrome
-          }
+          autoninja -C out\Release_GN_x64 chrome
 
       - name: Package
         shell: pwsh
@@ -233,7 +200,7 @@ jobs:
           Copy-Item "$outDir\*.bin" $dest -ErrorAction SilentlyContinue
           if (Test-Path "$outDir\locales") { Copy-Item -Recurse "$outDir\locales" $dest }
           Copy-Item -Recurse "${{ github.workspace }}\metachat\metachat\ui" "$dest\metachat_ui"
-          $vcRedist = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Redist\MSVC"
+          $vcRedist = "C:\Program Files\Microsoft Visual Studio\2022\BuildTools\VC\Redist\MSVC"
           $crtDir = Get-ChildItem "$vcRedist\*\onecore\x64\Microsoft.VC143.CRT" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
           if ($crtDir) { Copy-Item "$($crtDir.FullName)\*.dll" $dest; Write-Host "CRT DLLs copied" -ForegroundColor Green }
           $mt = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\mt.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
@@ -248,6 +215,3 @@ jobs:
         with:
           name: metachat-browser-windows
           path: metachat-browser-windows.zip
-
-
-
