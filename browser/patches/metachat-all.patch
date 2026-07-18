@@ -10086,7 +10086,7 @@ new file mode 100644
 index 0000000000000..53991c8d465c5
 --- /dev/null
 +++ b/chrome/browser/ui/webui/metachat/metachat_ui.cc
-@@ -0,0 +1,54 @@
+@@ -0,0 +1,68 @@
 +// Copyright 2025 The MetaChat Authors. All rights reserved.
 +
 +#include "chrome/browser/ui/webui/metachat/metachat_ui.h"
@@ -10098,6 +10098,7 @@ index 0000000000000..53991c8d465c5
 +#include "base/logging.h"
 +#include "base/memory/ref_counted_memory.h"
 +#include "base/path_service.h"
++#include "base/task/thread_pool.h"
 +#include "chrome/browser/profiles/profile.h"
 +#include "chrome/browser/ui/webui/metachat/message_bus.h"
 +#include "chrome/common/webui_url_constants.h"
@@ -10121,21 +10122,34 @@ index 0000000000000..53991c8d465c5
 +      profile, kChromeUIMetaChatHost);
 +  source->SetRequestFilter(
 +      base::BindRepeating([](const std::string& path) { return true; }),
-+      base::BindRepeating([](const std::string& path,
-+                             content::WebUIDataSource::GotDataCallback callback) {
-+        base::FilePath exe_dir;
-+        base::PathService::Get(base::FILE_EXE, &exe_dir);
-+        base::FilePath file_path = exe_dir.DirName()
-+            .Append(FILE_PATH_LITERAL("metachat_ui"))
-+            .Append(base::FilePath::FromUTF8Unsafe(
-+                path == "/" ? "index.html" : path.substr(1)));
-+        std::string content;
-+        if (base::ReadFileToString(file_path, &content))
-+          std::move(callback).Run(
-+              base::MakeRefCounted<base::RefCountedString>(std::move(content)));
-+        else
-+          std::move(callback).Run(nullptr);
-+      }));
++      base::BindRepeating(
++          [](const std::string& path,
++             content::WebUIDataSource::GotDataCallback callback) {
++            base::FilePath exe_dir;
++            base::PathService::Get(base::FILE_EXE, &exe_dir);
++            base::FilePath file_path = exe_dir.DirName()
++                .Append(FILE_PATH_LITERAL("metachat_ui"))
++                .Append(base::FilePath::FromUTF8Unsafe(
++                    path == "/" ? "index.html" : path.substr(1)));
++            base::ThreadPool::PostTaskAndReplyWithResult(
++                FROM_HERE, {base::MayBlock()},
++                base::BindOnce(
++                    [](const base::FilePath& p)
++                        -> scoped_refptr<base::RefCountedString> {
++                      std::string content;
++                      if (!base::ReadFileToString(p, &content))
++                        return nullptr;
++                      return base::MakeRefCounted<base::RefCountedString>(
++                          std::move(content));
++                    },
++                    std::move(file_path)),
++                base::BindOnce(
++                    [](content::WebUIDataSource::GotDataCallback cb,
++                       scoped_refptr<base::RefCountedString> result) {
++                      std::move(cb).Run(std::move(result));
++                    },
++                    std::move(callback)));
++          }));
 +  DVLOG(1) << "MetaChat: UI created";
 +  web_ui->AddMessageHandler(std::make_unique<MetaChatMessageBus>());
 +}
