@@ -36,6 +36,17 @@ jobs:
         with:
           path: metachat
 
+
+      - name: Configure Git
+        shell: pwsh
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.filemode false
+          git config --global core.fscache true
+          git config --global core.preloadindex true
+          git config --global user.email "runner@github.com"
+          git config --global user.name "GitHub Runner"
+
       - name: Setup depot_tools
         shell: pwsh
         run: |
