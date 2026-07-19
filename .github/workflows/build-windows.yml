@@ -195,6 +195,19 @@ jobs:
             "dawn_enable_vulkan_validation_layers = false" + [char]10 +
             "angle_enable_vulkan_validation_layers = false"
           ))
+          # Ensure rust-toolchain VERSION exists (fallback if update_rust.py failed)
+          if (-not (Test-Path "third_party/rust-toolchain/VERSION")) {
+            Write-Host "rust VERSION missing, fallback..." -ForegroundColor Yellow
+            & python3 tools\rust\update_rust.py
+            if (-not (Test-Path "third_party/rust-toolchain/VERSION")) {
+              $deps = Get-Content DEPS -Raw
+              if ($deps -match '"rust_version": "([^"]+)"') {
+                $rv = $matches[1]
+                Set-Content "third_party/rust-toolchain/VERSION" -Value $rv -NoNewline
+                Write-Host "Fallback VERSION: $rv" -ForegroundColor Green
+              }
+            }
+          }
           gn gen out\Release_GN_x64
 
       - name: Build
