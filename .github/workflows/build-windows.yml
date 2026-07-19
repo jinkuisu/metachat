@@ -208,6 +208,20 @@ jobs:
               }
             }
           }
+          if (-not (Test-Path "third_party/llvm-build/Release+Asserts/cr_build_revision")) {
+            Write-Host "clang stamp missing, fallback..." -ForegroundColor Yellow
+            & python3 tools\clang\scripts\update.py
+            if (-not (Test-Path "third_party/llvm-build/Release+Asserts/cr_build_revision")) {
+              $deps = Get-Content DEPS -Raw
+              if ($deps -match 'Win/clang-([a-z0-9-]+)\.tar\.xz') {
+                $rev = $matches[1]
+                $stampDir = "third_party/llvm-build/Release+Asserts"
+                New-Item -ItemType Directory -Force -Path $stampDir
+                Set-Content "$stampDir/cr_build_revision" -Value $rev -NoNewline
+                Write-Host "Fallback clang rev: $rev" -ForegroundColor Green
+              }
+            }
+          }
           gn gen out\Release_GN_x64
 
       - name: Build
