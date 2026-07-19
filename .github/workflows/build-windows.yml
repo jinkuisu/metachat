@@ -152,6 +152,11 @@ jobs:
           python3 tools\clang\scripts\update.py
           python3 tools\rust\update_rust.py
 
+      - name: Run gclient hooks (install platform deps)
+        shell: pwsh
+        run: |
+          cd $env:CHROMIUM_DIR
+          gclient runhooks
       - name: Generate LASTCHANGE
         shell: pwsh
         run: |
@@ -225,4 +230,3 @@ jobs:
         with:
           name: metachat-browser-windows
           path: metachat-browser-windows.zip
-
